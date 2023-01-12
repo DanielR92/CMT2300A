@@ -23,7 +23,7 @@
 #else
     #define PIN_HIGH(pin) digitalWrite(pin, HIGH)
     #define PIN_LOW(pin) digitalWrite(pin, LOW)
-    #define PIN_GET(pin) digitalRead(pin);
+    #define PIN_GET(pin) digitalRead(pin)
 #endif
 
 template<uint8_t PIN_CSB, uint8_t PIN_FCS, uint8_t PIN_SCK, uint8_t PIN_SDIO>
