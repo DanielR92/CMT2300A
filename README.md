@@ -1,0 +1,2 @@
+# CMT2300A
+CMT2300A 868/915MHz SMD Wireless Modul SPI 20dBm Antennen IPEX/Stempel 3KM E49-900M20S
