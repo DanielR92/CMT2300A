@@ -1,5 +1,5 @@
 //-----------------------------------------------------------------------------
-// 2022 Ahoy, https://www.mikrocontroller.net/topic/525778
+// 2023 Ahoy, https://www.mikrocontroller.net/topic/525778
 // Creative Commons - http://creativecommons.org/licenses/by-nc-sa/3.0/de/
 //-----------------------------------------------------------------------------
 
@@ -12,26 +12,138 @@
 #define DEF_SCK_PIN                     14 // D5 - GPIO14
 #define DEF_SDIO_PIN                    12 // D6 - GPIO12
 
+//-----------------------------------------------------------------------------
 #define CMT2300A_MASK_CFG_RETAIN        0x10
 #define CMT2300A_MASK_RSTN_IN_EN        0x20
 #define CMT2300A_MASK_LOCKING_EN        0x20
 #define CMT2300A_MASK_CHIP_MODE_STA     0x0F
 
-#define CMT2300A_CUS_MODE_CTL           0x60
-#define CMT2300A_CUS_MODE_STA           0x61
+//-----------------------------------------------------------------------------
+// detailed register infos from AN142_CMT2300AW_Quick_Start_Guide-Rev0.8.pdf
+
+#define CMT2300A_CUS_MODE_CTL           0x60    // [7] go_switch
+                                                // [6] go_tx
+                                                // [5] go_tfs
+                                                // [4] go_sleep
+                                                // [3] go_rx
+                                                // [2] go_rfs
+                                                // [1] go_stby
+                                                // [0] n/a
+
+#define CMT2300A_CUS_MODE_STA           0x61    // [3:0] 0x00 IDLE
+                                                //       0x01 SLEEP
+                                                //       0x02 STBY
+                                                //       0x03 RFS
+                                                //       0x04 TFS
+                                                //       0x05 RX
+                                                //       0x06 TX
+                                                //       0x08 UNLOCKED/LOW_VDD
+                                                //       0x09 CAL
 #define CMT2300A_CUS_EN_CTL             0x62
 #define CMT2300A_CUS_FREQ_CHNL          0x63
-#define CMT2300A_CUS_INT_CLR1           0x6A
+
+#define CMT2300A_CUS_IO_SEL             0x65    // [5:4] GPIO3
+                                                ///      0x00 CLKO
+                                                //       0x01 DOUT / DIN
+                                                //       0x02 INT2
+                                                //       0x03 DCLK
+                                                // [3:2]  GPIO2
+                                                //       0x00 INT1
+                                                //       0x01 INT2
+                                                //       0x02 DOUT / DIN
+                                                //       0x03 DCLK
+                                                // [1:0]  GPIO1
+                                                //       0x00 DOUT / DIN
+                                                //       0x01 INT1
+                                                //       0x02 INT2
+                                                //       0x03 DCLK
+
+#define CMT2300A_CUS_INT1_CTL           0x66    // [4:0] INT1_SEL
+                                                //       0x00 RX active
+                                                //       0x01 TX active
+                                                //       0x02 RSSI VLD
+                                                //       0x03 Pream OK
+                                                //       0x04 SYNC OK
+                                                //       0x05 NODE OK
+                                                //       0x06 CRC OK
+                                                //       0x07 PKT OK
+                                                //       0x08 SL TMO
+                                                //       0x09 RX TMO
+                                                //       0x0A TX DONE
+                                                //       0x0B RX FIFO NMTY
+                                                //       0x0C RX FIFO TH
+                                                //       0x0D RX FIFO FULL
+                                                //       0x0E RX FIFO WBYTE
+                                                //       0x0F RX FIFO OVF
+                                                //       0x10 TX FIFO NMTY
+                                                //       0x11 TX FIFO TH
+                                                //       0x12 TX FIFO FULL
+                                                //       0x13 STATE IS STBY
+                                                //       0x14 STATE IS FS
+                                                //       0x15 STATE IS RX
+                                                //       0x16 STATE IS TX
+                                                //       0x17 LED
+                                                //       0x18 TRX ACTIVE
+                                                //       0x19 PKT DONE
+
+#define CMT2300A_CUS_INT2_CTL           0x67    // [4:0] INT2_SEL
+
+#define CMT2300A_CUS_INT_EN             0x68    // [7] SL TMO EN
+                                                // [6] RX TMO EN
+                                                // [5] TX DONE EN
+                                                // [4] PREAM OK EN
+                                                // [3] SYNC_OK EN
+                                                // [2] NODE OK EN
+                                                // [1] CRC OK EN
+                                                // [0] PKT DONE EN
+
+#define CMT2300A_CUS_FIFO_CTL           0x69    // [7] TX DIN EN
+                                                // [6:5] TX DIN SEL
+                                                //     0x00 SEL GPIO1
+                                                //     0x01 SEL GPIO2
+                                                //     0x02 SEL GPIO3
+                                                // [4] FIFO AUTO CLR DIS
+                                                // [3] FIFO TX RD EN
+                                                // [2] FIFO RX TX SEL
+                                                // [1] FIFO MERGE EN
+                                                // [0] SPI FIFO RD WR SEL
+
+#define CMT2300A_CUS_INT_CLR1           0x6A // clear interrupts Bank1
+#define CMT2300A_CUS_INT_CLR2           0x6B // clear interrupts Bank2
 #define CMT2300A_CUS_FIFO_CLR           0x6C
-#define CMT2300A_CUS_INT_FLAG           0x6D
 
-#define CMT2300A_GO_STBY                0x02
-#define CMT2300A_GO_RX                  0x08
+#define CMT2300A_CUS_INT_FLAG           0x6D    // [7] LBD FLG
+                                                // [6] COL ERR FLG
+                                                // [5] PKT ERR FLG
+                                                // [4] PREAM OK FLG
+                                                // [3] SYNC OK FLG
+                                                // [2] NODE OK FLG
+                                                // [1] CRC OK FLG
+                                                // [0] PKT OK FLG
+
+#define CMT2300A_CUS_RSSI_DBM           0x70
+
+#define CMT2300A_GO_SWITCH              0x80
 #define CMT2300A_GO_TX                  0x40
+#define CMT2300A_GO_TFS                 0x20
+#define CMT2300A_GO_SLEEP               0x10
+#define CMT2300A_GO_RX                  0x08
+#define CMT2300A_GO_RFS                 0x04
+#define CMT2300A_GO_STBY                0x02
+#define CMT2300A_GO_EEPROM              0x01
 
+#define CMT2300A_STA_IDLE               0x00
+#define CMT2300A_STA_SLEEP              0x01
 #define CMT2300A_STA_STBY               0x02
-#define CMT2300A_STA_TX                 0x06
+#define CMT2300A_STA_RFS                0x03
+#define CMT2300A_STA_TFS                0x04
 #define CMT2300A_STA_RX                 0x05
+#define CMT2300A_STA_TX                 0x06
+#define CMT2300A_STA_EEPROM             0x07
+#define CMT2300A_STA_ERROR              0x08
+#define CMT2300A_STA_CAL                0x09
+
+#define CMT2300A_INT_SEL_TX_DONE        0x0A
 
 #define CMT2300A_MASK_TX_DONE_FLG       0x08
 #define CMT2300A_MASK_PKT_OK_FLG        0x01
@@ -108,6 +220,22 @@ bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor) {
     }
     return false;
 }
+
+//-----------------------------------------------------------------------------
+void waitTxDone(void) {
+    uint8_t val = 0x00;
+    while (0x08 != val) {
+        val = spi3w.readReg(CMT2300A_CUS_INT_CLR1);
+    }
+    Serial.println("TX DONE!");
+}
+
+//-----------------------------------------------------------------------------
+/*void txData(uint8_t buf[], uint8_t len) {
+    // interrupt 1 control selection to TX DONE
+    if(CMT2300A_INT_SEL_TX_DONE != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
+        spi3w.writeReg(CMT2300A_CUS_INT1_CTL, CMT2300A_INT_SEL_TX_DONE);
+}*/
 
 //-----------------------------------------------------------------------------
 void setup() {
@@ -260,22 +388,20 @@ void setup() {
     spi3w.writeReg(0x5F, 0x7F);
 
     if(0x02 != spi3w.readReg(0x09))
-        Serial.println("error 4");
+        spi3w.writeReg(0x09, 0x02);
 
-    spi3w.writeReg(0x09, 0x02);
-    spi3w.writeReg(0x65, 0x20);
+    spi3w.writeReg(CMT2300A_CUS_IO_SEL, 0x20); // -> GPIO3_SEL[1:0] = 0x02
 
+    // interrupt 1 control selection to TX DONE
+    if(CMT2300A_INT_SEL_TX_DONE != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
+        spi3w.writeReg(CMT2300A_CUS_INT1_CTL, CMT2300A_INT_SEL_TX_DONE);
 
-    if(0x00 != spi3w.readReg(0x66))
-        Serial.println("error 5");
+    // select interrupt 2
+    if(0x07 != spi3w.readReg(CMT2300A_CUS_INT2_CTL))
+        spi3w.writeReg(CMT2300A_CUS_INT2_CTL, 0x07);
 
-    spi3w.writeReg(0x66, 0x0A);
-
-    if(0x00 != spi3w.readReg(0x67))
-        Serial.println("error 6");
-
-    spi3w.writeReg(0x67, 0x07);
-    spi3w.writeReg(0x68, 0x3B);
+    // interrupt enable (TX_DONE, PREAM_OK, SYNC_OK, CRC_OK, PKT_DONE)
+    spi3w.writeReg(CMT2300A_CUS_INT_EN, 0x3B);
 
     spi3w.writeReg(0x41, 0x48);
     spi3w.writeReg(0x42, 0x5A);
@@ -283,19 +409,14 @@ void setup() {
     spi3w.writeReg(0x44, 0x4D);
     spi3w.writeReg(0x64, 0x64);
 
-    if(0x00 != spi3w.readReg(0x69))
-        Serial.println("error 7");
-    spi3w.writeReg(0x69, 0x02);
+    if(0x00 == spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
+        spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02); // FIFO_MERGE_EN
 
-    spi3w.writeReg(0x60, 0x10);
-    while(0x51 != spi3w.readReg(0x61)) {
-        yield();
-    }
+    if(!cmtSwitchStatus(CMT2300A_GO_SLEEP, CMT2300A_STA_SLEEP))
+        Serial.println("warn: not switched to sleep mode!");
 
-    spi3w.writeReg(0x60, 0x02);
-    while(0x52 != spi3w.readReg(0x61)) {
-        yield();
-    }
+    if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+        Serial.println("warn: not switched to standby mode!");
 
     spi3w.writeReg(0x18, 0x42);
     spi3w.writeReg(0x19, 0xA9);
@@ -313,43 +434,37 @@ void setup() {
     spi3w.writeReg(0x26, 0x0C);
     spi3w.writeReg(0x27, 0x0A);
 
-    spi3w.writeReg(0x60, 0x10);
-    while(0x51 != spi3w.readReg(0x61)) {
-        yield();
-    }
+    if(!cmtSwitchStatus(CMT2300A_GO_SLEEP, CMT2300A_STA_SLEEP))
+        Serial.println("warn: not switched to sleep mode!");
 
-    spi3w.writeReg(0x60, 0x02);
-    while(0x52 != spi3w.readReg(0x61)) {
-        yield();
-    }
+    if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+        Serial.println("warn: not switched to standby mode!");
 
     spi3w.writeReg(0x03, 0x1D);
     spi3w.writeReg(0x5C, 0x8A);
     spi3w.writeReg(0x5D, 0x18);
 
-    spi3w.writeReg(0x60, 0x10);
-    while(0x51 != spi3w.readReg(0x61)) {
-        yield();
-    }
+    if(!cmtSwitchStatus(CMT2300A_GO_SLEEP, CMT2300A_STA_SLEEP))
+        Serial.println("warn: not switched to sleep mode!");
 
-    spi3w.writeReg(0x60, 0x02);
-    while(0x52 != spi3w.readReg(0x61)) {
-        yield();
-    }
+    if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+        Serial.println("warn: not switched to standby mode!");
 
-    if(0x0A != spi3w.readReg(0x66))
-        Serial.println("error 8");
+    if(CMT2300A_INT_SEL_TX_DONE != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
+        Serial.println("interrupt selection failed!");
 
-    spi3w.writeReg(0x6D, 0x00);
+    spi3w.writeReg(CMT2300A_CUS_INT_FLAG, 0x00);
 
-    if(0x00 != spi3w.readReg(0x6A))
-        Serial.println("error 9");
-    spi3w.writeReg(0x6A, 0x00);
+    // clear interrupts bank1
+    if(0x00 != spi3w.readReg(CMT2300A_CUS_INT_CLR1))
+        Serial.println("warn: unprocessed interrupts!");
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
 
-    spi3w.writeReg(0x6B, 0x00);
-    if(0x02 != spi3w.readReg(0x69))
+    // clear interrupts bank2
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+    if(0x02 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
         Serial.println("error 10");
-    spi3w.writeReg(0x69, 0x02);
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02); // FIFO_MERGE_EN
     spi3w.writeReg(0x6C, 0x02);
     spi3w.writeReg(0x16, 0x0C);
     spi3w.writeReg(0x63, 0x01);
@@ -419,26 +534,36 @@ void loop() {
     ts++;
 
     if((++cnt % 5) == 0) {
-        spi3w.writeReg(0x6A, 0x00);
-        spi3w.writeReg(0x6B, 0x00);
-        spi3w.writeReg(0x60, 0x02);
-        while(0x52 != spi3w.readReg(0x61)) {
-            yield();
-        }
+        // clear all interrupts
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
 
-        if(0x0A != spi3w.readReg(0x66))
+        if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+            Serial.println("warn: not switched to standby mode!");
+
+        uint8_t val;
+        // check interrupt control selection
+        if(0x0A != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
             Serial.println("error 20");
-        if(0x00 != spi3w.readReg(0x6D))
-            Serial.println("error 21");
-        if(0x00 != spi3w.readReg(0x6A))
-            Serial.println("error 22");
+
+        val = spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+        if(0x00 != val) {
+            Serial.println("error 21 " + String(val , HEX));
+            while(0x00 != spi3w.readReg(CMT2300A_CUS_INT_FLAG)) {
+                yield();
+            }
+        }
+        val = spi3w.readReg(CMT2300A_CUS_INT_CLR1);
+        if(0x00 != val)
+            Serial.println("error 22 " + String(val , HEX));
 
 
-        spi3w.writeReg(0x6A, 0x00);
-        spi3w.writeReg(0x6B, 0x00);
-        if(0x02 != spi3w.readReg(0x69))
-            Serial.println("error 23");
-        spi3w.writeReg(0x69, 0x07);
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+        val = spi3w.readReg(CMT2300A_CUS_FIFO_CTL);
+        if(0x02 != val)
+            Serial.println("error 23 " + String(val , HEX));
+        spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x07);
         spi3w.writeReg(0x6C, 0x01);
 
         if(0x01 != spi3w.readReg(0x45))
@@ -461,6 +586,8 @@ void loop() {
             rqst[26] = crc8(rqst, 26);
             spi3w.writeFifo(rqst, 27);
             dumpBuf("request data", rqst, 27);
+
+            waitTxDone();
         }
         else {
             txOk = false;
