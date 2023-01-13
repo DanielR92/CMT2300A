@@ -6,35 +6,13 @@
 #include <Arduino.h>
 //#include "SPI.h"
 #include "softSpi3w.h"
+#include "cmt2300a_defs.h"
+#include "cmt2300a_params.h"
 
 #define DEF_CS_PIN                      16 // D0 - GPIO16
 #define DEF_FCS_PIN                     2  // D4 - GPIO2
 #define DEF_SCK_PIN                     14 // D5 - GPIO14
 #define DEF_SDIO_PIN                    12 // D6 - GPIO12
-
-#define CMT2300A_MASK_CFG_RETAIN        0x10
-#define CMT2300A_MASK_RSTN_IN_EN        0x20
-#define CMT2300A_MASK_LOCKING_EN        0x20
-#define CMT2300A_MASK_CHIP_MODE_STA     0x0F
-
-#define CMT2300A_CUS_MODE_CTL           0x60
-#define CMT2300A_CUS_MODE_STA           0x61
-#define CMT2300A_CUS_EN_CTL             0x62
-#define CMT2300A_CUS_FREQ_CHNL          0x63
-#define CMT2300A_CUS_INT_CLR1           0x6A
-#define CMT2300A_CUS_FIFO_CLR           0x6C
-#define CMT2300A_CUS_INT_FLAG           0x6D
-
-#define CMT2300A_GO_STBY                0x02
-#define CMT2300A_GO_RX                  0x08
-#define CMT2300A_GO_TX                  0x40
-
-#define CMT2300A_STA_STBY               0x02
-#define CMT2300A_STA_TX                 0x06
-#define CMT2300A_STA_RX                 0x05
-
-#define CMT2300A_MASK_TX_DONE_FLG       0x08
-#define CMT2300A_MASK_PKT_OK_FLG        0x01
 
 #define CRC8_INIT                       0x00
 #define CRC8_POLY                       0x01
@@ -109,7 +87,35 @@ bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor) {
     return false;
 }
 
+
 //-----------------------------------------------------------------------------
+/*! ********************************************************
+* @name    CMT2300A_ConfigRegBank
+* @desc    Config one register bank.
+* *********************************************************/
+bool CMT2300A_ConfigRegBank(u8 base_addr, const u8 bank[], u8 len)
+{
+    u8 i;
+    for(i=0; i<len; i++)
+        spi3w.writeReg(i+base_addr, bank[i]);
+
+    return true;
+}
+
+
+void IntRegBank()
+{
+	u8 tmp;	
+    CMT2300A_ConfigRegBank(CMT2300A_CMT_BANK_ADDR       , g_cmt2300aCmtBank       , CMT2300A_CMT_BANK_SIZE       );
+    CMT2300A_ConfigRegBank(CMT2300A_SYSTEM_BANK_ADDR    , g_cmt2300aSystemBank    , CMT2300A_SYSTEM_BANK_SIZE    );
+    CMT2300A_ConfigRegBank(CMT2300A_FREQUENCY_BANK_ADDR , g_cmt2300aFrequencyBank , CMT2300A_FREQUENCY_BANK_SIZE );
+    CMT2300A_ConfigRegBank(CMT2300A_DATA_RATE_BANK_ADDR , g_cmt2300aDataRateBank  , CMT2300A_DATA_RATE_BANK_SIZE );
+    CMT2300A_ConfigRegBank(CMT2300A_BASEBAND_BANK_ADDR  , g_cmt2300aBasebandBank  , CMT2300A_BASEBAND_BANK_SIZE  );
+    CMT2300A_ConfigRegBank(CMT2300A_TX_BANK_ADDR        , g_cmt2300aTxBank        , CMT2300A_TX_BANK_SIZE        );    
+	tmp = (~0x07) & spi3w.readReg(CMT2300A_CUS_CMT10);// xosc_aac_code[2:0] = 2
+    spi3w.writeReg(CMT2300A_CUS_CMT10, tmp|0x02);
+}
+
 void setup() {
     Serial.begin(115200);
     cnt = 0;
@@ -157,107 +163,7 @@ void setup() {
     ///////////////////
     spi3w.writeReg(0x0D, 0x00);
 
-    spi3w.writeReg(0x00, 0x00);
-    spi3w.writeReg(0x01, 0x66);
-    spi3w.writeReg(0x02, 0xEC);
-    spi3w.writeReg(0x03, 0x1D);
-    spi3w.writeReg(0x04, 0x70);
-    spi3w.writeReg(0x05, 0x80);
-    spi3w.writeReg(0x06, 0x14);
-    spi3w.writeReg(0x07, 0x08);
-    spi3w.writeReg(0x08, 0x91);
-    spi3w.writeReg(0x09, 0x02);
-    spi3w.writeReg(0x0A, 0x02);
-    spi3w.writeReg(0x0B, 0xD0);
-    spi3w.writeReg(0x0C, 0xAE);
-    spi3w.writeReg(0x0D, 0xE0);
-    spi3w.writeReg(0x0E, 0x35);
-    spi3w.writeReg(0x0F, 0x00);
-
-    spi3w.writeReg(0x10, 0x00);
-    spi3w.writeReg(0x11, 0xF4);
-    spi3w.writeReg(0x12, 0x10);
-    spi3w.writeReg(0x13, 0xE2);
-    spi3w.writeReg(0x14, 0x42);
-    spi3w.writeReg(0x15, 0x20);
-    spi3w.writeReg(0x16, 0x0C);
-    spi3w.writeReg(0x17, 0x81);
-    spi3w.writeReg(0x18, 0x42);
-    spi3w.writeReg(0x19, 0xCF);
-    spi3w.writeReg(0x1A, 0xA7);
-    spi3w.writeReg(0x1B, 0x8C);
-    spi3w.writeReg(0x1C, 0x42);
-    spi3w.writeReg(0x1D, 0xC4);
-    spi3w.writeReg(0x1E, 0x4E);
-    spi3w.writeReg(0x1F, 0x1C);
-
-    spi3w.writeReg(0x20, 0xA6);
-    spi3w.writeReg(0x21, 0xC9);
-    spi3w.writeReg(0x22, 0x20);
-    spi3w.writeReg(0x23, 0x20);
-    spi3w.writeReg(0x24, 0xD2);
-    spi3w.writeReg(0x25, 0x35);
-    spi3w.writeReg(0x26, 0x0C);
-    spi3w.writeReg(0x27, 0x0A);
-    spi3w.writeReg(0x28, 0x9F);
-    spi3w.writeReg(0x29, 0x4B);
-    spi3w.writeReg(0x2A, 0x29);
-    spi3w.writeReg(0x2B, 0x29);
-    spi3w.writeReg(0x2C, 0xC0);
-    spi3w.writeReg(0x2D, 0x14);
-    spi3w.writeReg(0x2E, 0x05);
-    spi3w.writeReg(0x2F, 0x53);
-
-    spi3w.writeReg(0x30, 0x10);
-    spi3w.writeReg(0x31, 0x00);
-    spi3w.writeReg(0x32, 0xB4);
-    spi3w.writeReg(0x33, 0x00);
-    spi3w.writeReg(0x34, 0x00);
-    spi3w.writeReg(0x35, 0x01);
-    spi3w.writeReg(0x36, 0x00);
-    spi3w.writeReg(0x37, 0x00);
-    spi3w.writeReg(0x38, 0x12);
-    spi3w.writeReg(0x39, 0x1E);
-    spi3w.writeReg(0x3A, 0x00);
-    spi3w.writeReg(0x3B, 0xAA);
-    spi3w.writeReg(0x3C, 0x06);
-    spi3w.writeReg(0x3D, 0x00);
-    spi3w.writeReg(0x3E, 0x00);
-    spi3w.writeReg(0x3F, 0x00);
-
-    spi3w.writeReg(0x40, 0x00);
-    spi3w.writeReg(0x41, 0xD6);
-    spi3w.writeReg(0x42, 0xD5);
-    spi3w.writeReg(0x43, 0xD4);
-    spi3w.writeReg(0x44, 0x2D);
-    spi3w.writeReg(0x45, 0x01);
-    spi3w.writeReg(0x46, 0x1D);
-    spi3w.writeReg(0x47, 0x00);
-    spi3w.writeReg(0x48, 0x00);
-    spi3w.writeReg(0x49, 0x00);
-    spi3w.writeReg(0x4A, 0x00);
-    spi3w.writeReg(0x4B, 0x00);
-    spi3w.writeReg(0x4C, 0xC3);
-    spi3w.writeReg(0x4D, 0x00);
-    spi3w.writeReg(0x4E, 0x00);
-    spi3w.writeReg(0x4F, 0x60);
-
-    spi3w.writeReg(0x50, 0xFF);
-    spi3w.writeReg(0x51, 0x00);
-    spi3w.writeReg(0x52, 0x00);
-    spi3w.writeReg(0x53, 0x1F);
-    spi3w.writeReg(0x54, 0x10);
-    spi3w.writeReg(0x55, 0x70);
-    spi3w.writeReg(0x56, 0x4D);
-    spi3w.writeReg(0x57, 0x06);
-    spi3w.writeReg(0x58, 0x00);
-    spi3w.writeReg(0x59, 0x07);
-    spi3w.writeReg(0x5A, 0x50);
-    spi3w.writeReg(0x5B, 0x00);
-    spi3w.writeReg(0x5C, 0x8A);
-    spi3w.writeReg(0x5D, 0x18);
-    spi3w.writeReg(0x5E, 0x3F);
-    spi3w.writeReg(0x5F, 0x7F);
+    IntRegBank();
 
     if(0x02 != spi3w.readReg(0x09))
         Serial.println("error 4");
