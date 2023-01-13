@@ -132,23 +132,25 @@ void setup() {
     if(cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
         Serial.println("standby mode reached");
 
-    spi3w.readReg(0x48);
-    spi3w.writeReg(0x48, 0xAA);
-    if(0xAA != spi3w.readReg(0x48))
+    spi3w.readReg(CMT2300A_CUS_PKT17);
+    spi3w.writeReg(CMT2300A_CUS_PKT17, 0xAA);
+    if(0xAA != spi3w.readReg(CMT2300A_CUS_PKT17))
         Serial.println("error 1");
-    spi3w.writeReg(0x48, 0x00);
+    spi3w.writeReg(CMT2300A_CUS_PKT17, 0x00);
 
     spi3w.readReg(CMT2300A_CUS_MODE_STA); // 0x61
     spi3w.writeReg(CMT2300A_CUS_MODE_STA, 0x52);
-    if(0x00 != spi3w.readReg(0x62))
+
+    if(0x00 != spi3w.readReg(CMT2300A_CUS_EN_CTL))
         Serial.println("error 2");
-    spi3w.writeReg(0x62, 0x20);
-    if(0xE0 != spi3w.readReg(0x0D))
+    spi3w.writeReg(CMT2300A_CUS_EN_CTL, 0x20);
+
+    if(0xE0 != spi3w.readReg(CMT2300A_CUS_SYS2))
         Serial.println("error 3");
+    spi3w.writeReg(CMT2300A_CUS_SYS2, 0x00);
 
-
-    uint8_t tmp;
-/*    tmp = spi3w.readReg(CMT2300A_CUS_MODE_STA);
+/*    uint8_t tmp;
+    tmp = spi3w.readReg(CMT2300A_CUS_MODE_STA);
     tmp |= CMT2300A_MASK_CFG_RETAIN;         // Enable CFG_RETAIN
     tmp &= ~CMT2300A_MASK_RSTN_IN_EN;        // Disable RSTN_IN
     spi3w.writeReg(CMT2300A_CUS_MODE_STA, tmp);
@@ -161,104 +163,104 @@ void setup() {
 
 
     ///////////////////
-    spi3w.writeReg(0x0D, 0x00);
+
 
     IntRegBank();
 
-    if(0x02 != spi3w.readReg(0x09))
+    if(0x02 != spi3w.readReg(CMT2300A_CUS_CMT10))
         Serial.println("error 4");
-
-    spi3w.writeReg(0x09, 0x02);
-    spi3w.writeReg(0x65, 0x20);
+    spi3w.writeReg(CMT2300A_CUS_CMT10, 0x02);
 
 
-    if(0x00 != spi3w.readReg(0x66))
+    spi3w.writeReg(CMT2300A_CUS_IO_SEL, 0x20);
+
+
+    if(0x00 != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
         Serial.println("error 5");
+    spi3w.writeReg(CMT2300A_CUS_INT1_CTL, 0x0A);
 
-    spi3w.writeReg(0x66, 0x0A);
-
-    if(0x00 != spi3w.readReg(0x67))
+    if(0x00 != spi3w.readReg(CMT2300A_CUS_INT2_CTL))
         Serial.println("error 6");
+    spi3w.writeReg(CMT2300A_CUS_INT2_CTL, 0x07);
 
-    spi3w.writeReg(0x67, 0x07);
-    spi3w.writeReg(0x68, 0x3B);
+    spi3w.writeReg(CMT2300A_CUS_INT_EN, 0x3B);
 
-    spi3w.writeReg(0x41, 0x48);
-    spi3w.writeReg(0x42, 0x5A);
-    spi3w.writeReg(0x43, 0x48);
-    spi3w.writeReg(0x44, 0x4D);
-    spi3w.writeReg(0x64, 0x64);
+    spi3w.writeReg(CMT2300A_CUS_PKT10, 0x48);
+    spi3w.writeReg(CMT2300A_CUS_PKT11, 0x5A);
+    spi3w.writeReg(CMT2300A_CUS_PKT12, 0x48);
+    spi3w.writeReg(CMT2300A_CUS_PKT13, 0x4D);
+    spi3w.writeReg(CMT2300A_CUS_PKT15, 0x64);
 
-    if(0x00 != spi3w.readReg(0x69))
+    if(0x00 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
         Serial.println("error 7");
-    spi3w.writeReg(0x69, 0x02);
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
 
-    spi3w.writeReg(0x60, 0x10);
-    while(0x51 != spi3w.readReg(0x61)) {
+    spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x10);
+    while(0x51 != spi3w.readReg(CMT2300A_CUS_MODE_STA)) {
         yield();
     }
 
-    spi3w.writeReg(0x60, 0x02);
-    while(0x52 != spi3w.readReg(0x61)) {
+    spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x02);
+    while(0x52 != spi3w.readReg(CMT2300A_CUS_MODE_STA)) {
         yield();
     }
 
-    spi3w.writeReg(0x18, 0x42);
-    spi3w.writeReg(0x19, 0xA9);
-    spi3w.writeReg(0x1A, 0xA4);
-    spi3w.writeReg(0x1B, 0x8C);
-    spi3w.writeReg(0x1C, 0x42);
-    spi3w.writeReg(0x1D, 0x9E);
-    spi3w.writeReg(0x1E, 0x4B);
-    spi3w.writeReg(0x1F, 0x1C);
+    spi3w.writeReg(CMT2300A_CUS_RF1, 0x42);
+    spi3w.writeReg(CMT2300A_CUS_RF2, 0xA9);
+    spi3w.writeReg(CMT2300A_CUS_RF3, 0xA4);
+    spi3w.writeReg(CMT2300A_CUS_RF4, 0x8C);
+    spi3w.writeReg(CMT2300A_CUS_RF5, 0x42);
+    spi3w.writeReg(CMT2300A_CUS_RF6, 0x9E);
+    spi3w.writeReg(CMT2300A_CUS_RF7, 0x4B);
+    spi3w.writeReg(CMT2300A_CUS_RF8, 0x1C);
+    spi3w.writeReg(CMT2300A_CUS_RF11, 0x20);
+    spi3w.writeReg(CMT2300A_CUS_RF12, 0x20);
 
-    spi3w.writeReg(0x22, 0x20);
-    spi3w.writeReg(0x23, 0x20);
-    spi3w.writeReg(0x24, 0xD2);
-    spi3w.writeReg(0x25, 0x35);
-    spi3w.writeReg(0x26, 0x0C);
-    spi3w.writeReg(0x27, 0x0A);
+    spi3w.writeReg(CMT2300A_CUS_FSK1, 0xD2);
+    spi3w.writeReg(CMT2300A_CUS_FSK2, 0x35);
+    spi3w.writeReg(CMT2300A_CUS_FSK3, 0x0C);
+    spi3w.writeReg(CMT2300A_CUS_FSK4, 0x0A);
 
-    spi3w.writeReg(0x60, 0x10);
-    while(0x51 != spi3w.readReg(0x61)) {
+    spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x10);
+    while(0x51 != spi3w.readReg(CMT2300A_CUS_MODE_STA)) {
         yield();
     }
 
-    spi3w.writeReg(0x60, 0x02);
-    while(0x52 != spi3w.readReg(0x61)) {
+    spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x02);
+    while(0x52 != spi3w.readReg(CMT2300A_CUS_MODE_STA)) {
         yield();
     }
 
-    spi3w.writeReg(0x03, 0x1D);
-    spi3w.writeReg(0x5C, 0x8A);
-    spi3w.writeReg(0x5D, 0x18);
+    spi3w.writeReg(CMT2300A_CUS_CMT4, 0x1D);
+    spi3w.writeReg(CMT2300A_CUS_TX8, 0x8A);
+    spi3w.writeReg(CMT2300A_CUS_TX9, 0x18);
 
-    spi3w.writeReg(0x60, 0x10);
-    while(0x51 != spi3w.readReg(0x61)) {
+    spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x10);
+    while(0x51 != spi3w.readReg(CMT2300A_CUS_MODE_STA)) {
         yield();
     }
 
-    spi3w.writeReg(0x60, 0x02);
-    while(0x52 != spi3w.readReg(0x61)) {
+    spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x02);
+    while(0x52 != spi3w.readReg(CMT2300A_CUS_MODE_STA)) {
         yield();
     }
 
     if(0x0A != spi3w.readReg(0x66))
         Serial.println("error 8");
 
-    spi3w.writeReg(0x6D, 0x00);
+    spi3w.writeReg(CMT2300A_CUS_INT_FLAG, 0x00);
 
-    if(0x00 != spi3w.readReg(0x6A))
+    if(0x00 != spi3w.readReg(CMT2300A_CUS_INT_CLR1))
         Serial.println("error 9");
-    spi3w.writeReg(0x6A, 0x00);
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
 
-    spi3w.writeReg(0x6B, 0x00);
-    if(0x02 != spi3w.readReg(0x69))
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+    if(0x02 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
         Serial.println("error 10");
-    spi3w.writeReg(0x69, 0x02);
-    spi3w.writeReg(0x6C, 0x02);
-    spi3w.writeReg(0x16, 0x0C);
-    spi3w.writeReg(0x63, 0x01);
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
+    spi3w.writeReg(CMT2300A_CUS_SYS11, 0x0C);
+    spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x01);
 
     uint8_t cfg0[11] = {
         0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -325,33 +327,35 @@ void loop() {
     ts++;
 
     if((++cnt % 5) == 0) {
-        spi3w.writeReg(0x6A, 0x00);
-        spi3w.writeReg(0x6B, 0x00);
-        spi3w.writeReg(0x60, 0x02);
-        while(0x52 != spi3w.readReg(0x61)) {
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+        spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x02);
+        while(0x52 != spi3w.readReg(CMT2300A_CUS_MODE_STA)) {
             yield();
         }
 
-        if(0x0A != spi3w.readReg(0x66))
+        if(0x0A != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
             Serial.println("error 20");
-        if(0x00 != spi3w.readReg(0x6D))
+        if(0x00 != spi3w.readReg(CMT2300A_CUS_INT_FLAG))
             Serial.println("error 21");
-        if(0x00 != spi3w.readReg(0x6A))
+        if(0x00 != spi3w.readReg(CMT2300A_CUS_INT_CLR1))
             Serial.println("error 22");
 
 
-        spi3w.writeReg(0x6A, 0x00);
-        spi3w.writeReg(0x6B, 0x00);
-        if(0x02 != spi3w.readReg(0x69))
-            Serial.println("error 23");
-        spi3w.writeReg(0x69, 0x07);
-        spi3w.writeReg(0x6C, 0x01);
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
 
-        if(0x01 != spi3w.readReg(0x45))
+        if(0x02 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
+            Serial.println("error 23");
+        spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x07);
+
+        spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x01);
+
+        if(0x01 != spi3w.readReg(CMT2300A_CUS_PKT14))
             Serial.println("error 24");
 
-        spi3w.writeReg(0x45, 0x01);
-        spi3w.writeReg(0x46, 0x1B);
+        spi3w.writeReg(CMT2300A_CUS_PKT14, 0x01);
+        spi3w.writeReg(CMT2300A_CUS_PKT15, 0x1B);
 
         spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x21); //0x63
         if(cmtSwitchStatus(CMT2300A_GO_TX, CMT2300A_STA_TX)) {
