@@ -304,7 +304,7 @@ static  u8 g_cmt2300aBasebandBank[CMT2300A_BASEBAND_BANK_SIZE] = {
 0xD6,
 0xD5,
 0xD4,
-0xD2,
+0x2D,
 0x01,
 0x1D,
 0x00,
@@ -336,7 +336,6 @@ static  u8 g_cmt2300aTxBank[CMT2300A_TX_BANK_SIZE] = {
 0x18,
 0x3F,
 0x7F,
-
 };
 
 #ifdef __cplusplus 
