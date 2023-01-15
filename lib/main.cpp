@@ -161,6 +161,8 @@ typedef SoftSpi3w<DEF_CS_PIN, DEF_FCS_PIN, DEF_SCK_PIN, DEF_SDIO_PIN> SpiType;
 SpiType spi3w;
 uint16_t cnt;
 
+uint8_t mLastFreq;
+
 // config
 uint32_t ts  = 0x63BFDBE1; // timestamp
 uint32_t dtu = 0x83266790;
@@ -220,6 +222,87 @@ bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor, uint16_t cycles = 10) {
 }
 
 //-----------------------------------------------------------------------------
+void rxInner(void) {
+    if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+        Serial.println("warn: not switched to standby mode!");
+
+    // interrupt 1 control selection to TX DONE
+    if(CMT2300A_INT_SEL_TX_DONE != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
+        spi3w.writeReg(CMT2300A_CUS_INT1_CTL, CMT2300A_INT_SEL_TX_DONE);
+
+    if(0x00 != spi3w.readReg(CMT2300A_CUS_INT_CLR1))
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+
+    if(0x02 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
+        spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
+
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
+    spi3w.writeReg(0x16, 0x0C);
+
+    if(++mLastFreq > 0x22)
+        mLastFreq = 0x20;
+    spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, mLastFreq); // 0x20, 0x21, 0x22
+
+    if(!cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX))
+        Serial.println("warn: cant reach RX mode!");
+
+    for(uint8_t i = 0; i < 52; i++) {
+        spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+    }
+
+    // is this correct here?
+    uint8_t buf[27] = {0};
+    spi3w.readFifo(buf, 27);
+
+    // only print buffer if some fields are not equal 0
+    for(uint8_t i = 0; i < 27; i++) {
+        if(buf[i] != 0) {
+            dumpBuf("fifo", buf, 27);
+            break;
+        }
+    }
+}
+
+//-----------------------------------------------------------------------------
+void rxData(void) {
+    if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+        Serial.println("warn: not switched to standby mode!");
+
+    // interrupt 1 control selection to TX DONE
+    if(CMT2300A_INT_SEL_TX_DONE != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
+        spi3w.writeReg(CMT2300A_CUS_INT1_CTL, CMT2300A_INT_SEL_TX_DONE);
+
+    spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+
+    if(0x04 != spi3w.readReg(CMT2300A_CUS_INT_CLR1))
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x04);
+
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+
+    if(0x02 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
+        spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
+
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
+    spi3w.writeReg(0x16, 0x0C);
+
+    if(++mLastFreq > 0x22)
+        mLastFreq = 0x20;
+    spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, mLastFreq); // 0x20, 0x21, 0x22
+
+    if(!cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX))
+        Serial.println("warn: cant reach RX mode!");
+
+    spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+
+    for(uint8_t i = 0; i < 50; i++) {
+        rxInner();
+    }
+
+    Serial.println("RSSI: " + String(spi3w.readReg(CMT2300A_CUS_RSSI_DBM)));
+}
+
+//-----------------------------------------------------------------------------
 void txData(uint8_t buf[], uint8_t len) {
     // interrupt 1 control selection to TX DONE
     if(CMT2300A_INT_SEL_TX_DONE != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
@@ -261,7 +344,7 @@ void txData(uint8_t buf[], uint8_t len) {
     spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x21);
 
     if(!cmtSwitchStatus(CMT2300A_GO_TX, CMT2300A_STA_TX, 100))
-        Serial.println("warn: cant reach tx mode!");
+        Serial.println("warn: cant reach TX mode!");
 
     // wait for tx done
     while(CMT2300A_MASK_TX_DONE_FLG != spi3w.readReg(CMT2300A_CUS_INT_CLR1)) {
@@ -273,6 +356,7 @@ void txData(uint8_t buf[], uint8_t len) {
 void setup() {
     Serial.begin(115200);
     cnt = 0;
+    mLastFreq = 0x20;
     spi3w.setup();
 
     delay(1000);
@@ -538,9 +622,9 @@ void loop() {
         };
         txData(rqst, 27);
     }
+    rxData();
 
-
-    if(cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX)) {
+    /*if(cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX)) {
         //Serial.println("rx mode ok");
         uint8_t buf[27] = {0};
         spi3w.readFifo(buf, 27);
@@ -552,5 +636,5 @@ void loop() {
                 break;
             }
         }
-    }
+    }*/
 }
