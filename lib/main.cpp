@@ -9,6 +9,8 @@
 #include "cmt2300a_defs.h"
 #include "cmt2300a_params.h"
 
+#define ENABLE_AUTO_SWITCH_CHIP_STATUS   /* Enable the auto switch chip status */
+
 #define DEF_CS_PIN                      16 // D0 - GPIO16
 #define DEF_FCS_PIN                     2  // D4 - GPIO2
 #define DEF_SCK_PIN                     14 // D5 - GPIO14
@@ -35,10 +37,66 @@ uint32_t wr  = 0x80423810;
 // end config
 
 
-uint8_t getChipStatus(void) {
+uint8_t CMT2300A_GetChipStatus(void) {
     return spi3w.readReg(CMT2300A_CUS_MODE_STA) & CMT2300A_MASK_CHIP_MODE_STA;
 }
 
+/*! ********************************************************
+* @name    CMT2300A_AutoSwitchStatus
+* @desc    Auto switch the chip status, and 10 ms as timeout.
+* @param   nGoCmd: the chip next status
+* @return  TRUE or FALSE
+* *********************************************************/
+bool CMT2300A_AutoSwitchStatus(u8 nGoCmd)
+{
+#ifdef ENABLE_AUTO_SWITCH_CHIP_STATUS
+//    u32 nBegTick = CMT2300A_GetTickCount();
+	uint8_t nBegTick = 3;
+    u8  nWaitStatus;
+    
+    switch(nGoCmd)
+    {
+    case CMT2300A_GO_SLEEP: nWaitStatus = CMT2300A_STA_SLEEP; break;
+    case CMT2300A_GO_STBY : nWaitStatus = CMT2300A_STA_STBY ; break;
+    case CMT2300A_GO_TFS  : nWaitStatus = CMT2300A_STA_TFS  ; break;
+    case CMT2300A_GO_TX   : nWaitStatus = CMT2300A_STA_TX   ; break;
+    case CMT2300A_GO_RFS  : nWaitStatus = CMT2300A_STA_RFS  ; break;
+    case CMT2300A_GO_RX   : nWaitStatus = CMT2300A_STA_RX   ; break;
+    }
+    
+    spi3w.writeReg(CMT2300A_CUS_MODE_CTL, nGoCmd);
+    
+//    while(CMT2300A_GetTickCount()-nBegTick < 10)
+	while(nBegTick--)
+    {
+        delay(1);
+        
+        if(nWaitStatus==CMT2300A_GetChipStatus())
+            return true;
+        
+        Serial.print("ChipStatus: ");
+        Serial.println(nWaitStatus);
+
+        if(CMT2300A_GO_TX==nGoCmd) {
+            delay(1);
+            if(CMT2300A_MASK_TX_DONE_FLG & spi3w.readReg(CMT2300A_CUS_INT_CLR1))
+                return true;
+        }
+        
+        if(CMT2300A_GO_RX==nGoCmd) {
+            delay(1);
+            if(CMT2300A_MASK_PKT_OK_FLG & spi3w.readReg(CMT2300A_CUS_INT_FLAG))
+                return true;
+        }
+    }
+    
+    return false;
+    
+#else
+    spi3w.writeReg(CMT2300A_CUS_MODE_CTL, nGoCmd);
+    return true;
+#endif
+}
 //-----------------------------------------------------------------------------
 uint8_t crc8(uint8_t buf[], uint8_t len) {
     uint8_t crc = CRC8_INIT;
@@ -50,7 +108,6 @@ uint8_t crc8(uint8_t buf[], uint8_t len) {
     }
     return crc;
 }
-
 //-----------------------------------------------------------------------------
 void dumpBuf(const char* des, uint8_t buf[], uint8_t len) {
     Serial.println("------------------");
@@ -62,14 +119,13 @@ void dumpBuf(const char* des, uint8_t buf[], uint8_t len) {
     }
     Serial.println("");
 }
-
 //-----------------------------------------------------------------------------
 bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor) {
     uint8_t i = 10;
     spi3w.writeReg(CMT2300A_CUS_MODE_CTL, cmd);
     while(i--) {
         delayMicroseconds(1);
-        if(waitFor == getChipStatus())
+        if(waitFor == CMT2300A_GetChipStatus())
             return true;
 
         /*if(CMT2300A_GO_TX == cmd) {
@@ -86,8 +142,6 @@ bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor) {
     }
     return false;
 }
-
-
 //-----------------------------------------------------------------------------
 /*! ********************************************************
 * @name    CMT2300A_ConfigRegBank
@@ -101,48 +155,219 @@ bool CMT2300A_ConfigRegBank(u8 base_addr, const u8 bank[], u8 len)
 
     return true;
 }
-
-
+/*! ********************************************************
+* @name    CMT2300A_SoftReset
+* @desc    Soft reset.
+* *********************************************************/
+void CMT2300A_SoftReset(void)
+{
+    spi3w.writeReg(0x7F, 0xFF);
+    delay(20);
+}
 void IntRegBank()
 {
-	u8 tmp;	
     CMT2300A_ConfigRegBank(CMT2300A_CMT_BANK_ADDR       , g_cmt2300aCmtBank       , CMT2300A_CMT_BANK_SIZE       );
     CMT2300A_ConfigRegBank(CMT2300A_SYSTEM_BANK_ADDR    , g_cmt2300aSystemBank    , CMT2300A_SYSTEM_BANK_SIZE    );
     CMT2300A_ConfigRegBank(CMT2300A_FREQUENCY_BANK_ADDR , g_cmt2300aFrequencyBank , CMT2300A_FREQUENCY_BANK_SIZE );
     CMT2300A_ConfigRegBank(CMT2300A_DATA_RATE_BANK_ADDR , g_cmt2300aDataRateBank  , CMT2300A_DATA_RATE_BANK_SIZE );
     CMT2300A_ConfigRegBank(CMT2300A_BASEBAND_BANK_ADDR  , g_cmt2300aBasebandBank  , CMT2300A_BASEBAND_BANK_SIZE  );
     CMT2300A_ConfigRegBank(CMT2300A_TX_BANK_ADDR        , g_cmt2300aTxBank        , CMT2300A_TX_BANK_SIZE        );    
-	tmp = (~0x07) & spi3w.readReg(CMT2300A_CUS_CMT10);// xosc_aac_code[2:0] = 2
+	u8 tmp = (~0x07) & spi3w.readReg(CMT2300A_CUS_CMT10);// xosc_aac_code[2:0] = 2
     spi3w.writeReg(CMT2300A_CUS_CMT10, tmp|0x02);
+}
+/*! ********************************************************
+* @name    CMT2300A_IsExist
+* @desc    Chip indentify.
+* @return  TRUE: chip is exist, FALSE: chip not found
+* *********************************************************/
+bool CMT2300A_IsExist(void)
+{
+    u8 back, dat;
+
+    back = spi3w.readReg(CMT2300A_CUS_PKT17);
+    spi3w.writeReg(CMT2300A_CUS_PKT17, 0xAA);
+
+    dat = spi3w.readReg(CMT2300A_CUS_PKT17);
+    spi3w.writeReg(CMT2300A_CUS_PKT17, back);
+
+    if(0xAA != dat)
+    {
+        Serial.println("CMT2300A... not reachable!");
+        return false;
+    }
+    return true;
+}
+/*! ********************************************************
+* @name    CMT2300A_GoStby
+* @desc    Entry Sleep mode.
+* @return  TRUE or FALSE
+* *********************************************************/
+BOOL CMT2300A_GoStby(void)
+{
+    return CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY);
+}
+/*! ********************************************************
+* @name    CMT2300A_ClearInterruptFlags
+* @desc    Clear all interrupt flags.
+* @return  Some interrupt flags
+*            CMT2300A_MASK_SL_TMO_EN    |
+*            CMT2300A_MASK_RX_TMO_EN    |
+*            CMT2300A_MASK_TX_DONE_EN   |
+*            CMT2300A_MASK_PREAM_OK_FLG |
+*            CMT2300A_MASK_SYNC_OK_FLG  |
+*            CMT2300A_MASK_NODE_OK_FLG  |
+*            CMT2300A_MASK_CRC_OK_FLG   |
+*            CMT2300A_MASK_PKT_OK_FLG
+* *********************************************************/
+u8 CMT2300A_ClearInterruptFlags(void)
+{
+    u8 nFlag1, nFlag2;
+    u8 nClr1 = 0;
+    u8 nClr2 = 0;
+    u8 nRet  = 0;
+    u8 nIntPolar;
+    
+    nIntPolar = spi3w.readReg(CMT2300A_CUS_INT1_CTL);
+    nIntPolar = (nIntPolar & CMT2300A_MASK_INT_POLAR) ?1 :0;
+
+    nFlag1 = spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+    nFlag2 = spi3w.readReg(CMT2300A_CUS_INT_CLR1);
+    
+    if(nIntPolar) {
+        /* Interrupt flag active-low */
+        nFlag1 = ~nFlag1;
+        nFlag2 = ~nFlag2;
+    }
+
+    if(CMT2300A_MASK_LBD_FLG & nFlag1) {
+        nClr2 |= CMT2300A_MASK_LBD_CLR;         /* Clear LBD_FLG */
+    }
+
+    if(CMT2300A_MASK_COL_ERR_FLG & nFlag1) {
+        nClr2 |= CMT2300A_MASK_PKT_DONE_CLR;    /* Clear COL_ERR_FLG by PKT_DONE_CLR */
+    }
+
+    if(CMT2300A_MASK_PKT_ERR_FLG & nFlag1) {
+        nClr2 |= CMT2300A_MASK_PKT_DONE_CLR;    /* Clear PKT_ERR_FLG by PKT_DONE_CLR */
+    }
+
+    if(CMT2300A_MASK_PREAM_OK_FLG & nFlag1) {
+        nClr2 |= CMT2300A_MASK_PREAM_OK_CLR;    /* Clear PREAM_OK_FLG */
+        nRet  |= CMT2300A_MASK_PREAM_OK_FLG;    /* Return PREAM_OK_FLG */
+    }
+
+    if(CMT2300A_MASK_SYNC_OK_FLG & nFlag1) {
+        nClr2 |= CMT2300A_MASK_SYNC_OK_CLR;    /* Clear SYNC_OK_FLG */
+        nRet  |= CMT2300A_MASK_SYNC_OK_FLG;    /* Return SYNC_OK_FLG */
+    }
+
+    if(CMT2300A_MASK_NODE_OK_FLG & nFlag1) {
+        nClr2 |= CMT2300A_MASK_NODE_OK_CLR;    /* Clear NODE_OK_FLG */
+        nRet  |= CMT2300A_MASK_NODE_OK_FLG;    /* Return NODE_OK_FLG */
+    }
+
+    if(CMT2300A_MASK_CRC_OK_FLG & nFlag1) {
+        nClr2 |= CMT2300A_MASK_CRC_OK_CLR;    /* Clear CRC_OK_FLG */
+        nRet  |= CMT2300A_MASK_CRC_OK_FLG;    /* Return CRC_OK_FLG */
+    }
+
+    if(CMT2300A_MASK_PKT_OK_FLG & nFlag1) {
+        nClr2 |= CMT2300A_MASK_PKT_DONE_CLR;  /* Clear PKT_OK_FLG */
+        nRet  |= CMT2300A_MASK_PKT_OK_FLG;    /* Return PKT_OK_FLG */
+    }    
+
+    if(CMT2300A_MASK_SL_TMO_FLG & nFlag2) {
+        nClr1 |= CMT2300A_MASK_SL_TMO_CLR;    /* Clear SL_TMO_FLG */
+        nRet  |= CMT2300A_MASK_SL_TMO_EN;     /* Return SL_TMO_FLG by SL_TMO_EN */
+    }
+
+    if(CMT2300A_MASK_RX_TMO_FLG & nFlag2) {
+        nClr1 |= CMT2300A_MASK_RX_TMO_CLR;    /* Clear RX_TMO_FLG */
+        nRet  |= CMT2300A_MASK_RX_TMO_EN;     /* Return RX_TMO_FLG by RX_TMO_EN */
+    }
+
+    if(CMT2300A_MASK_TX_DONE_FLG & nFlag2) {
+        nClr1 |= CMT2300A_MASK_TX_DONE_CLR;   /* Clear TX_DONE_FLG */
+        nRet  |= CMT2300A_MASK_TX_DONE_EN;    /* Return TX_DONE_FLG by TX_DONE_EN */
+    }
+    
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR1, nClr1);
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR2, nClr2);
+
+    if(nIntPolar) {
+        /* Interrupt flag active-low */
+        nRet = ~nRet;
+    }
+
+    return nRet;
+}
+/*! ********************************************************
+* @name    CMT2300A_Init
+* @desc    Initialize chip status.
+* *********************************************************/
+void CMT2300A_Init(void)
+{
+    CMT2300A_SoftReset();
+    delay(20);
+    
+    Serial.print("CMT2300A_GoStby: ");
+    Serial.println(CMT2300A_GoStby());
+
+    u8 tmp  = spi3w.readReg(CMT2300A_CUS_MODE_STA);
+    tmp |= CMT2300A_MASK_CFG_RETAIN;         /* Enable CFG_RETAIN */
+    tmp &= ~CMT2300A_MASK_RSTN_IN_EN;        /* Disable RSTN_IN */
+    spi3w.writeReg(CMT2300A_CUS_MODE_STA, tmp);
+
+    tmp  = spi3w.readReg(CMT2300A_CUS_EN_CTL);
+    tmp |= CMT2300A_MASK_LOCKING_EN;         /* Enable LOCKING_EN */
+    spi3w.writeReg(CMT2300A_CUS_EN_CTL, tmp);
+    CMT2300A_ClearInterruptFlags();
+}
+bool CMT2300A_Int(void)
+{
+    if(!CMT2300A_IsExist())
+        return false;
+
+    //IntGPIO();
+    //cmt_spi3_init();
+    CMT2300A_Init();
+
+    //IntRegBank();
+    //IntRegInterupt();
+
+    //pinMode(CMT2300A_GPIO1_PIN, INPUT);
+    //attachInterrupt(CMT2300A_GPIO1_PIN, GPIO1_interrupt_callback, RISING);
+    /*if(!CMT2300A_goRX())
+        return false;*/
+    return true;
 }
 
 void setup() {
     Serial.begin(115200);
+    Serial.println("Load lib for CMT2300A");
+
     cnt = 0;
     txOk = false;
     spi3w.setup();
 
     delay(1000);
+
+    CMT2300A_Int();
+
     Serial.println("start");
 
-    spi3w.writeReg(0x7f, 0xff); // soft reset
-    delay(20);
-
+    // soft reset
+    CMT2300A_SoftReset(); 
+    
     // go to standby mode
     if(cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
         Serial.println("standby mode reached");
-
-    spi3w.readReg(CMT2300A_CUS_PKT17);
-    spi3w.writeReg(CMT2300A_CUS_PKT17, 0xAA);
-    if(0xAA != spi3w.readReg(CMT2300A_CUS_PKT17))
-        Serial.println("error 1");
-    spi3w.writeReg(CMT2300A_CUS_PKT17, 0x00);
 
     spi3w.readReg(CMT2300A_CUS_MODE_STA); // 0x61
     spi3w.writeReg(CMT2300A_CUS_MODE_STA, 0x52);
 
     if(0x00 != spi3w.readReg(CMT2300A_CUS_EN_CTL))
-        Serial.println("error 2");
+        Serial.println("CUS_EN_CTL: read error 2");
     spi3w.writeReg(CMT2300A_CUS_EN_CTL, 0x20);
 
     if(0xE0 != spi3w.readReg(CMT2300A_CUS_SYS2))
@@ -171,9 +396,7 @@ void setup() {
         Serial.println("error 4");
     spi3w.writeReg(CMT2300A_CUS_CMT10, 0x02);
 
-
     spi3w.writeReg(CMT2300A_CUS_IO_SEL, 0x20);
-
 
     if(0x00 != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
         Serial.println("error 5");

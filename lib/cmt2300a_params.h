@@ -338,6 +338,7 @@ static  u8 g_cmt2300aTxBank[CMT2300A_TX_BANK_SIZE] = {
 0x7F,
 };
 
+// CRC-16/XMODEM should be 0x0F82
 #ifdef __cplusplus 
 } 
 #endif
