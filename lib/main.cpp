@@ -151,16 +151,15 @@
 #define CRC8_INIT                       0x00
 #define CRC8_POLY                       0x01
 
-#define UINT32_BYTE_3(val) ((uint8_t)((val >> 24) & 0xff))
-#define UINT32_BYTE_2(val) ((uint8_t)((val >> 16) & 0xff))
-#define UINT32_BYTE_1(val) ((uint8_t)((val >>  8) & 0xff))
-#define UINT32_BYTE_0(val) ((uint8_t)((val      ) & 0xff))
+#define U32_B3(val) ((uint8_t)((val >> 24) & 0xff))
+#define U32_B2(val) ((uint8_t)((val >> 16) & 0xff))
+#define U32_B1(val) ((uint8_t)((val >>  8) & 0xff))
+#define U32_B0(val) ((uint8_t)((val      ) & 0xff))
 
 typedef SoftSpi3w<DEF_CS_PIN, DEF_FCS_PIN, DEF_SCK_PIN, DEF_SDIO_PIN> SpiType;
 
 SpiType spi3w;
 uint16_t cnt;
-bool txOk;
 
 // config
 uint32_t ts  = 0x63BFDBE1; // timestamp
@@ -198,10 +197,9 @@ void dumpBuf(const char* des, uint8_t buf[], uint8_t len) {
 }
 
 //-----------------------------------------------------------------------------
-bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor) {
-    uint8_t i = 10;
+bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor, uint16_t cycles = 10) {
     spi3w.writeReg(CMT2300A_CUS_MODE_CTL, cmd);
-    while(i--) {
+    while(cycles--) {
         delayMicroseconds(1);
         if(waitFor == getChipStatus())
             return true;
@@ -222,26 +220,59 @@ bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor) {
 }
 
 //-----------------------------------------------------------------------------
-void waitTxDone(void) {
-    uint8_t val = 0x00;
-    while (0x08 != val) {
-        val = spi3w.readReg(CMT2300A_CUS_INT_CLR1);
-    }
-    Serial.println("TX DONE!");
-}
-
-//-----------------------------------------------------------------------------
-/*void txData(uint8_t buf[], uint8_t len) {
+void txData(uint8_t buf[], uint8_t len) {
     // interrupt 1 control selection to TX DONE
     if(CMT2300A_INT_SEL_TX_DONE != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
         spi3w.writeReg(CMT2300A_CUS_INT1_CTL, CMT2300A_INT_SEL_TX_DONE);
-}*/
+
+    spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+    spi3w.readReg(CMT2300A_CUS_INT_CLR1);
+
+    // clear all interrupts
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+
+    if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+        Serial.println("warn: not switched to standby mode!");
+
+    spi3w.readReg(CMT2300A_CUS_INT1_CTL);
+
+    spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+    spi3w.readReg(CMT2300A_CUS_INT_CLR1);
+
+    // clear all interrupts
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
+    spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+
+    if(0x07 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
+        spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x07);
+
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x01);
+
+    spi3w.readReg(0x45);
+    spi3w.writeReg(0x45, 0x01);
+    spi3w.writeReg(0x46, 0x1B);
+
+    // write FIFO
+    buf[len-1] = crc8(buf, len-1);
+    spi3w.writeFifo(buf, len);
+    dumpBuf("TX", buf, len);
+
+    spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x21);
+
+    if(!cmtSwitchStatus(CMT2300A_GO_TX, CMT2300A_STA_TX, 100))
+        Serial.println("warn: cant reach tx mode!");
+
+    // wait for tx done
+    while(CMT2300A_MASK_TX_DONE_FLG != spi3w.readReg(CMT2300A_CUS_INT_CLR1)) {
+        yield();
+    }
+}
 
 //-----------------------------------------------------------------------------
 void setup() {
     Serial.begin(115200);
     cnt = 0;
-    txOk = false;
     spi3w.setup();
 
     delay(1000);
@@ -267,19 +298,6 @@ void setup() {
     spi3w.writeReg(0x62, 0x20);
     if(0xE0 != spi3w.readReg(0x0D))
         Serial.println("error 3");
-
-
-    uint8_t tmp;
-/*    tmp = spi3w.readReg(CMT2300A_CUS_MODE_STA);
-    tmp |= CMT2300A_MASK_CFG_RETAIN;         // Enable CFG_RETAIN
-    tmp &= ~CMT2300A_MASK_RSTN_IN_EN;        // Disable RSTN_IN
-    spi3w.writeReg(CMT2300A_CUS_MODE_STA, tmp);
-*/
-    /*spi3w.writeReg(CMT2300A_CUS_MODE_STA, 0x52);
-
-    tmp  = spi3w.readReg(CMT2300A_CUS_EN_CTL);
-    tmp |= CMT2300A_MASK_LOCKING_EN;         // Enable LOCKING_EN
-    spi3w.writeReg(CMT2300A_CUS_EN_CTL, tmp);*/
 
 
     ///////////////////
@@ -474,140 +492,65 @@ void setup() {
         0x00, 0x00, 0xff
     };
     uint8_t cfg1[15] = {
-        0x56, UINT32_BYTE_3(wr), UINT32_BYTE_2(wr), UINT32_BYTE_1(wr), UINT32_BYTE_0(wr), UINT32_BYTE_3(wr), UINT32_BYTE_2(wr), UINT32_BYTE_1(wr),
-        UINT32_BYTE_0(wr), 0x02, 0x15, 0x21, 0x0f, 0x14, 0xff
+        0x56, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(wr), U32_B2(wr), U32_B1(wr),
+        U32_B0(wr), 0x02, 0x15, 0x21, 0x0f, 0x14, 0xff
     };
     uint8_t cfg2[15] = {
-        0x56, UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu),
-        UINT32_BYTE_0(dtu), 0x01, 0x15, 0x21, 0x0f, 0x14, 0xff
+        0x56, U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
+        U32_B0(dtu), 0x01, 0x15, 0x21, 0x0f, 0x14, 0xff
     };
     uint8_t cfg3[11] = {
-        0x07, UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu),
-        UINT32_BYTE_0(dtu), 0x00, 0xff
+        0x07, U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
+        U32_B0(dtu), 0x00, 0xff
     };
     uint8_t cfg4[15] = {
-        0x56, UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu),
-        UINT32_BYTE_0(dtu), 0x01, 0x15, 0x21, 0x21, 0x14, 0xff
+        0x56, U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
+        U32_B0(dtu), 0x01, 0x15, 0x21, 0x21, 0x14, 0xff
     };
-    uint8_t i;
 
-    cfg0[10] = crc8(cfg0, 10);
-    spi3w.writeFifo(cfg0, 11);
-    dumpBuf("cfg0", cfg0, 11);
 
-    cfg1[14] = crc8(cfg1, 14);
-    for(i = 0; i < 5; i++) {
-        spi3w.writeFifo(cfg1, 15);
-        dumpBuf("cfg1", cfg1, 15);
+    // configure DTU SN and IV SN
+    txData(cfg0, 11);
+    for(uint8_t i = 0; i < 5; i++) {
+        txData(cfg1, 15);
     }
-
-    cfg2[14] = crc8(cfg2, 14);
-    spi3w.writeFifo(cfg2, 15);
-    dumpBuf("cfg2", cfg2, 15);
-
-    cfg3[10] = crc8(cfg3, 10);
-    spi3w.writeFifo(cfg3, 11);
-    dumpBuf("cfg3", cfg3, 11);
-
-    cfg4[14] = crc8(cfg4, 14);
-    spi3w.writeFifo(cfg4, 15);
-    dumpBuf("cfg4", cfg4, 15);
-
-    cfg2[14] = crc8(cfg2, 14);
-    spi3w.writeFifo(cfg2, 15);
-    dumpBuf("cfg2", cfg2, 15);
-
-    cfg1[14] = crc8(cfg1, 14);
-    for(i = 0; i < 3; i++) {
-        spi3w.writeFifo(cfg1, 15);
-        dumpBuf("cfg1", cfg1, 15);
+    txData(cfg2, 15);
+    txData(cfg3, 11);
+    txData(cfg4, 15);
+    txData(cfg2, 15);
+    for(uint8_t i = 0; i < 5; i++) {
+        txData(cfg1, 15);
     }
-
-    cfg2[14] = crc8(cfg2, 14);
-    spi3w.writeFifo(cfg2, 15);
-    dumpBuf("cfg2", cfg2, 15);
+    txData(cfg2, 15);
 }
 
 //-----------------------------------------------------------------------------
 void loop() {
-    delay(1000);
+    delay(3000);
     ts++;
 
     if((++cnt % 5) == 0) {
-        // clear all interrupts
-        spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
-        spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
-
-        if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
-            Serial.println("warn: not switched to standby mode!");
-
-        uint8_t val;
-        // check interrupt control selection
-        if(0x0A != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
-            Serial.println("error 20");
-
-        val = spi3w.readReg(CMT2300A_CUS_INT_FLAG);
-        if(0x00 != val) {
-            Serial.println("error 21 " + String(val , HEX));
-            while(0x00 != spi3w.readReg(CMT2300A_CUS_INT_FLAG)) {
-                yield();
-            }
-        }
-        val = spi3w.readReg(CMT2300A_CUS_INT_CLR1);
-        if(0x00 != val)
-            Serial.println("error 22 " + String(val , HEX));
-
-
-        spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
-        spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
-        val = spi3w.readReg(CMT2300A_CUS_FIFO_CTL);
-        if(0x02 != val)
-            Serial.println("error 23 " + String(val , HEX));
-        spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x07);
-        spi3w.writeReg(0x6C, 0x01);
-
-        if(0x01 != spi3w.readReg(0x45))
-            Serial.println("error 24");
-
-        spi3w.writeReg(0x45, 0x01);
-        spi3w.writeReg(0x46, 0x1B);
-
-        spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x21); //0x63
-        if(cmtSwitchStatus(CMT2300A_GO_TX, CMT2300A_STA_TX)) {
-            Serial.println("tx mode ok");
-            txOk = true;
-
-            uint8_t rqst[27] = {
-                0x15, UINT32_BYTE_3(wr), UINT32_BYTE_2(wr), UINT32_BYTE_1(wr), UINT32_BYTE_0(wr), 0x00, 0x00, 0x00,
-                0x01, 0x80, 0x0B, 0x00, UINT32_BYTE_3(ts), UINT32_BYTE_2(ts), UINT32_BYTE_1(ts), UINT32_BYTE_0(ts),
-                0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00,
-                0x88, 0x90, 0xff
-            };
-            rqst[26] = crc8(rqst, 26);
-            spi3w.writeFifo(rqst, 27);
-            dumpBuf("request data", rqst, 27);
-
-            waitTxDone();
-        }
-        else {
-            txOk = false;
-            Serial.println("can't switch to tx");
-        }
+        uint8_t rqst[27] = {
+            0x15, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), 0x00, 0x00, 0x00,
+            0x01, 0x80, 0x0B, 0x00, U32_B3(ts), U32_B2(ts), U32_B1(ts), U32_B0(ts),
+            0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00,
+            0x88, 0x90, 0xff
+        };
+        txData(rqst, 27);
     }
 
-    //if(txOk) {
-        if(cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX)) {
-            //Serial.println("rx mode ok");
-            uint8_t buf[27] = {0};
-            spi3w.readFifo(buf, 27);
 
-            // only print buffer if some fields are not equal 0
-            for(uint8_t i = 0; i < 27; i++) {
-                if(buf[i] != 0) {
-                    dumpBuf("fifo", buf, 27);
-                    break;
-                }
+    if(cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX)) {
+        //Serial.println("rx mode ok");
+        uint8_t buf[27] = {0};
+        spi3w.readFifo(buf, 27);
+
+        // only print buffer if some fields are not equal 0
+        for(uint8_t i = 0; i < 27; i++) {
+            if(buf[i] != 0) {
+                dumpBuf("fifo", buf, 27);
+                break;
             }
         }
-    //}
+    }
 }
