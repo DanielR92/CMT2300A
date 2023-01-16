@@ -11,24 +11,22 @@
 
 #define ENABLE_AUTO_SWITCH_CHIP_STATUS   /* Enable the auto switch chip status */
 
+/*#define DEF_GPIO1_PIN		            34 
 #define DEF_CS_PIN                      16 // D0 - GPIO16
 #define DEF_FCS_PIN                     2  // D4 - GPIO2
 #define DEF_SCK_PIN                     14 // D5 - GPIO14
-#define DEF_SDIO_PIN                    12 // D6 - GPIO12
+#define DEF_SDIO_PIN                    12 // D6 - GPIO12*/
+
+#define DEF_SCK_PIN			32
+#define DEF_SDIO_PIN		12
+#define DEF_CS_PIN			27
+#define DEF_FCS_PIN			25
+#define DEF_GPIO1_PIN		34  //interupt pin
+
+
 
 #define CRC8_INIT                       0x00
 #define CRC8_POLY                       0x01
-
-#define UINT32_BYTE_3(val) ((uint8_t)((val >> 24) & 0xff))
-#define UINT32_BYTE_2(val) ((uint8_t)((val >> 16) & 0xff))
-#define UINT32_BYTE_1(val) ((uint8_t)((val >>  8) & 0xff))
-#define UINT32_BYTE_0(val) ((uint8_t)((val      ) & 0xff))
-
-typedef SoftSpi3w<DEF_CS_PIN, DEF_FCS_PIN, DEF_SCK_PIN, DEF_SDIO_PIN> SpiType;
-
-SpiType spi3w;
-uint16_t cnt;
-bool txOk;
 
 // config
 uint32_t ts  = 0x63BFDBE1; // timestamp
@@ -36,6 +34,24 @@ uint32_t dtu = 0x83266790;
 uint32_t wr  = 0x80423810;
 // end config
 
+uint8_t _buffer[27] = {0};
+bool txOk;
+
+#define UINT32_BYTE_3(val) ((uint8_t)((val >> 24) & 0xff))
+#define UINT32_BYTE_2(val) ((uint8_t)((val >> 16) & 0xff))
+#define UINT32_BYTE_1(val) ((uint8_t)((val >>  8) & 0xff))
+#define UINT32_BYTE_0(val) ((uint8_t)((val      ) & 0xff))
+
+typedef SoftSpi3w<DEF_CS_PIN, DEF_FCS_PIN, DEF_SCK_PIN, DEF_SDIO_PIN, DEF_GPIO1_PIN> SpiType;
+
+SpiType spi3w;
+uint16_t cnt;
+
+void  drv_delay_ms(int _ms)
+{
+    int MsToUs=_ms*1000;   
+    delayMicroseconds(MsToUs);
+}
 
 uint8_t CMT2300A_GetChipStatus(void) {
     return spi3w.readReg(CMT2300A_CUS_MODE_STA) & CMT2300A_MASK_CHIP_MODE_STA;
@@ -52,7 +68,7 @@ bool CMT2300A_AutoSwitchStatus(u8 nGoCmd)
 #ifdef ENABLE_AUTO_SWITCH_CHIP_STATUS
 //    u32 nBegTick = CMT2300A_GetTickCount();
 	uint8_t nBegTick = 3;
-    u8  nWaitStatus;
+    uint8_t  nWaitStatus;
     
     switch(nGoCmd)
     {
@@ -74,9 +90,6 @@ bool CMT2300A_AutoSwitchStatus(u8 nGoCmd)
         if(nWaitStatus==CMT2300A_GetChipStatus())
             return true;
         
-        Serial.print("ChipStatus: ");
-        Serial.println(nWaitStatus);
-
         if(CMT2300A_GO_TX==nGoCmd) {
             delay(1);
             if(CMT2300A_MASK_TX_DONE_FLG & spi3w.readReg(CMT2300A_CUS_INT_CLR1))
@@ -114,33 +127,10 @@ void dumpBuf(const char* des, uint8_t buf[], uint8_t len) {
     Serial.println(String(des));
     for(uint8_t i = 0; i < len; i++) {
         if((0 != i) && (i % 8 == 0))
-            Serial.println("");
+            Serial.print("");
         Serial.print(String(buf[i], HEX) + " ");
     }
     Serial.println("");
-}
-//-----------------------------------------------------------------------------
-bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor) {
-    uint8_t i = 10;
-    spi3w.writeReg(CMT2300A_CUS_MODE_CTL, cmd);
-    while(i--) {
-        delayMicroseconds(1);
-        if(waitFor == CMT2300A_GetChipStatus())
-            return true;
-
-        /*if(CMT2300A_GO_TX == cmd) {
-            delayMicroseconds(1);
-
-            if(CMT2300A_MASK_TX_DONE_FLG & spi3w.readReg(CMT2300A_CUS_INT_CLR1))
-                return true;
-        } else if(CMT2300A_GO_RX == cmd) {
-            delayMicroseconds(1);
-
-            if(CMT2300A_MASK_PKT_OK_FLG & spi3w.readReg(CMT2300A_CUS_INT_FLAG))
-                return true;
-        }*/
-    }
-    return false;
 }
 //-----------------------------------------------------------------------------
 /*! ********************************************************
@@ -182,17 +172,14 @@ void IntRegBank()
 * *********************************************************/
 bool CMT2300A_IsExist(void)
 {
-    u8 back, dat;
-
-    back = spi3w.readReg(CMT2300A_CUS_PKT17);
+    uint8_t back = spi3w.readReg(CMT2300A_CUS_PKT17);
     spi3w.writeReg(CMT2300A_CUS_PKT17, 0xAA);
 
-    dat = spi3w.readReg(CMT2300A_CUS_PKT17);
+    uint8_t dat = spi3w.readReg(CMT2300A_CUS_PKT17);
     spi3w.writeReg(CMT2300A_CUS_PKT17, back);
 
     if(0xAA != dat)
     {
-        Serial.println("CMT2300A... not reachable!");
         return false;
     }
     return true;
@@ -219,13 +206,13 @@ BOOL CMT2300A_GoStby(void)
 *            CMT2300A_MASK_CRC_OK_FLG   |
 *            CMT2300A_MASK_PKT_OK_FLG
 * *********************************************************/
-u8 CMT2300A_ClearInterruptFlags(void)
+uint8_t CMT2300A_ClearInterruptFlags(void)
 {
-    u8 nFlag1, nFlag2;
-    u8 nClr1 = 0;
-    u8 nClr2 = 0;
-    u8 nRet  = 0;
-    u8 nIntPolar;
+    uint8_t nFlag1, nFlag2;
+    uint8_t nClr1 = 0;
+    uint8_t nClr2 = 0;
+    uint8_t nRet  = 0;
+    uint8_t nIntPolar;
     
     nIntPolar = spi3w.readReg(CMT2300A_CUS_INT1_CTL);
     nIntPolar = (nIntPolar & CMT2300A_MASK_INT_POLAR) ?1 :0;
@@ -302,18 +289,49 @@ u8 CMT2300A_ClearInterruptFlags(void)
     return nRet;
 }
 /*! ********************************************************
+* @name    CMT2300A_GoSleep
+* @desc    Entry SLEEP mode.
+* @return  TRUE or FALSE
+* *********************************************************/
+bool CMT2300A_GoSleep(void)
+{
+    return CMT2300A_AutoSwitchStatus(CMT2300A_GO_SLEEP);
+}
+/*! ********************************************************
+* @name    CMT2300A_EnableLfosc
+* @desc    If you need use sleep timer, you should enable LFOSC.
+* @param   bEnable(TRUE): Enable it(default)
+*          bEnable(FALSE): Disable it
+* *********************************************************/
+void CMT2300A_EnableLfosc(BOOL bEnable)
+{
+    uint8_t tmp = spi3w.readReg(CMT2300A_CUS_SYS2);
+    
+    if(bEnable) {
+        tmp |= CMT2300A_MASK_LFOSC_RECAL_EN;
+        tmp |= CMT2300A_MASK_LFOSC_CAL1_EN;
+        tmp |= CMT2300A_MASK_LFOSC_CAL2_EN;
+    }
+    else {
+        tmp &= ~CMT2300A_MASK_LFOSC_RECAL_EN;
+        tmp &= ~CMT2300A_MASK_LFOSC_CAL1_EN;
+        tmp &= ~CMT2300A_MASK_LFOSC_CAL2_EN;
+    }
+    
+    spi3w.writeReg(CMT2300A_CUS_SYS2, tmp);
+}
+/*! ********************************************************
 * @name    CMT2300A_Init
 * @desc    Initialize chip status.
 * *********************************************************/
 void CMT2300A_Init(void)
 {
     CMT2300A_SoftReset();
-    delay(20);
-    
-    Serial.print("CMT2300A_GoStby: ");
-    Serial.println(CMT2300A_GoStby());
+    drv_delay_ms(20);
 
-    u8 tmp  = spi3w.readReg(CMT2300A_CUS_MODE_STA);
+    CMT2300A_GoStby();
+
+    uint8_t tmp  = spi3w.readReg(CMT2300A_CUS_MODE_STA);
     tmp |= CMT2300A_MASK_CFG_RETAIN;         /* Enable CFG_RETAIN */
     tmp &= ~CMT2300A_MASK_RSTN_IN_EN;        /* Disable RSTN_IN */
     spi3w.writeReg(CMT2300A_CUS_MODE_STA, tmp);
@@ -321,82 +339,252 @@ void CMT2300A_Init(void)
     tmp  = spi3w.readReg(CMT2300A_CUS_EN_CTL);
     tmp |= CMT2300A_MASK_LOCKING_EN;         /* Enable LOCKING_EN */
     spi3w.writeReg(CMT2300A_CUS_EN_CTL, tmp);
+
+    CMT2300A_EnableLfosc(false);             /* Diable LFOSC */
+
     CMT2300A_ClearInterruptFlags();
+}
+/*! ********************************************************
+* @name    CMT2300A_EnableInterrupt
+* @desc    Enable interrupt.
+* @param   nEnable 
+*            CMT2300A_MASK_SL_TMO_EN   |
+*            CMT2300A_MASK_RX_TMO_EN   |
+*            CMT2300A_MASK_TX_DONE_EN  |
+*            CMT2300A_MASK_PREAM_OK_EN |
+*            CMT2300A_MASK_SYNC_OK_EN  |
+*            CMT2300A_MASK_NODE_OK_EN  |
+*            CMT2300A_MASK_CRC_OK_EN   |
+*            CMT2300A_MASK_PKT_DONE_EN
+* *********************************************************/
+void CMT2300A_EnableInterrupt(u8 nEnable)
+{
+    spi3w.writeReg(CMT2300A_CUS_INT_EN, nEnable);
+}
+/*! ********************************************************
+* @name    CMT2300A_ConfigGpio
+* @desc    Config GPIO pins mode.
+* @param   nGpioSel: GPIO1_SEL | GPIO2_SEL | GPIO3_SEL | GPIO4_SEL
+*          GPIO1_SEL:
+*            CMT2300A_GPIO1_SEL_DOUT/DIN 
+*            CMT2300A_GPIO1_SEL_INT1
+*            CMT2300A_GPIO1_SEL_INT2 
+*            CMT2300A_GPIO1_SEL_DCLK
+*
+*          GPIO2_SEL:
+*            CMT2300A_GPIO2_SEL_INT1 
+*            CMT2300A_GPIO2_SEL_INT2
+*            CMT2300A_GPIO2_SEL_DOUT/DIN 
+*            CMT2300A_GPIO2_SEL_DCLK
+*
+*          GPIO3_SEL:
+*            CMT2300A_GPIO3_SEL_CLKO 
+*            CMT2300A_GPIO3_SEL_DOUT/DIN
+*            CMT2300A_GPIO3_SEL_INT2 
+*            CMT2300A_GPIO3_SEL_DCLK
+*
+*          GPIO4_SEL:
+*            CMT2300A_GPIO4_SEL_RSTIN 
+*            CMT2300A_GPIO4_SEL_INT1
+*            CMT2300A_GPIO4_SEL_DOUT 
+*            CMT2300A_GPIO4_SEL_DCLK
+* *********************************************************/
+void CMT2300A_ConfigGpio(u8 nGpioSel)
+{
+    spi3w.writeReg(CMT2300A_CUS_IO_SEL, nGpioSel);
+}
+/*! ********************************************************
+* @name    CMT2300A_ConfigInterrupt
+* @desc    Config interrupt on INT1 and INT2.
+* @param   nInt1Sel, nInt2Sel
+*            CMT2300A_INT_SEL_RX_ACTIVE
+*            CMT2300A_INT_SEL_TX_ACTIVE
+*            CMT2300A_INT_SEL_RSSI_VLD
+*            CMT2300A_INT_SEL_PREAM_OK
+*            CMT2300A_INT_SEL_SYNC_OK
+*            CMT2300A_INT_SEL_NODE_OK
+*            CMT2300A_INT_SEL_CRC_OK
+*            CMT2300A_INT_SEL_PKT_OK
+*            CMT2300A_INT_SEL_SL_TMO
+*            CMT2300A_INT_SEL_RX_TMO
+*            CMT2300A_INT_SEL_TX_DONE
+*            CMT2300A_INT_SEL_RX_FIFO_NMTY
+*            CMT2300A_INT_SEL_RX_FIFO_TH
+*            CMT2300A_INT_SEL_RX_FIFO_FULL
+*            CMT2300A_INT_SEL_RX_FIFO_WBYTE
+*            CMT2300A_INT_SEL_RX_FIFO_OVF
+*            CMT2300A_INT_SEL_TX_FIFO_NMTY
+*            CMT2300A_INT_SEL_TX_FIFO_TH
+*            CMT2300A_INT_SEL_TX_FIFO_FULL
+*            CMT2300A_INT_SEL_STATE_IS_STBY
+*            CMT2300A_INT_SEL_STATE_IS_FS
+*            CMT2300A_INT_SEL_STATE_IS_RX
+*            CMT2300A_INT_SEL_STATE_IS_TX
+*            CMT2300A_INT_SEL_LED
+*            CMT2300A_INT_SEL_TRX_ACTIVE
+*            CMT2300A_INT_SEL_PKT_DONE
+* *********************************************************/
+void CMT2300A_ConfigInterrupt(u8 nInt1Sel, u8 nInt2Sel)
+{
+    nInt1Sel &= CMT2300A_MASK_INT1_SEL;
+    nInt1Sel |= (~CMT2300A_MASK_INT1_SEL) & spi3w.readReg(CMT2300A_CUS_INT1_CTL);
+    spi3w.writeReg(CMT2300A_CUS_INT1_CTL, nInt1Sel);
+
+    nInt2Sel &= CMT2300A_MASK_INT2_SEL;
+    nInt2Sel |= (~CMT2300A_MASK_INT2_SEL) & spi3w.readReg(CMT2300A_CUS_INT2_CTL);
+    spi3w.writeReg(CMT2300A_CUS_INT2_CTL, nInt2Sel);
+}
+/*! ********************************************************
+* @name    CMT2300A_EnableReadFifo
+* @desc    Enable SPI to read the FIFO.
+* *********************************************************/
+void CMT2300A_EnableReadFifo(void)
+{
+    u8 tmp = spi3w.readReg(CMT2300A_CUS_FIFO_CTL);
+    tmp &= ~CMT2300A_MASK_SPI_FIFO_RD_WR_SEL; 
+    tmp &= ~CMT2300A_MASK_FIFO_RX_TX_SEL;
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, tmp);
+}
+/*! ********************************************************
+* @name    CMT2300A_ClearFifo
+* @desc    Clear the Rx FIFO.
+* @return  FIFO flags
+*            CMT2300A_MASK_RX_FIFO_FULL_FLG |
+*            CMT2300A_MASK_RX_FIFO_NMTY_FLG |
+*            CMT2300A_MASK_RX_FIFO_TH_FLG   |
+*            CMT2300A_MASK_RX_FIFO_OVF_FLG  |
+*            CMT2300A_MASK_TX_FIFO_FULL_FLG |
+*            CMT2300A_MASK_TX_FIFO_NMTY_FLG |
+*            CMT2300A_MASK_TX_FIFO_TH_FLG
+* *********************************************************/
+uint8_t CMT2300A_ClearRxFifo(void)
+{
+    u8 tmp = spi3w.readReg(CMT2300A_CUS_FIFO_FLAG);
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, CMT2300A_MASK_FIFO_CLR_RX);
+    return tmp;
+}
+void IntRegInterupt()
+{
+	CMT2300A_ConfigGpio
+	(
+		//CMT2300A_GPIO1_SEL_INT1 | /* INT1 > GPIO1 */
+		//CMT2300A_GPIO2_SEL_INT2 | /* INT2 > GPIO2 */
+		//CMT2300A_GPIO3_SEL_DOUT
+        0x20
+	);
+    CMT2300A_ConfigInterrupt
+	(
+		//CMT2300A_INT_SEL_PKT_OK,  /* INT1 ist vollständig empfangen */
+        //CMT2300A_INT_SEL_TX_DONE  /* INT2 wird zum Senden abgeschlossen */
+        CMT2300A_INT_SEL_TX_DONE, CMT2300A_INT_SEL_PKT_OK
+	);
+
+    // original 0x3B
+    CMT2300A_EnableInterrupt
+	(
+		CMT2300A_MASK_TX_DONE_EN  |
+		CMT2300A_MASK_PREAM_OK_EN |
+		CMT2300A_MASK_SYNC_OK_EN  |
+		//CMT2300A_MASK_NODE_OK_EN  |
+		CMT2300A_MASK_CRC_OK_EN   |
+		CMT2300A_MASK_PKT_DONE_EN
+	);
+
+    //CMT2300A_EnableLfosc(false);///* Disable low frequency OSC calibration */ 
+    CMT2300A_GoSleep(); /* Go to sleep for configuration to take effect */
+}
+void IRAM_ATTR GPIO1_interrupt_callback() 
+{
+	CMT2300A_GoStby();
+    
+	spi3w.readFifo(_buffer, sizeof(_buffer)-1);
+	CMT2300A_ClearInterruptFlags();		
+	CMT2300A_GoSleep();
+
+	txOk = true;
+
+    // only print buffer if some fields are not equal 0
+    for(uint8_t i = 0; i < sizeof(_buffer); i++) {
+        if(_buffer[i] != 0) {
+            dumpBuf("fifo", _buffer, 27);
+            break;
+        }
+    }
+}
+/*! ********************************************************
+* @name    CMT2300A_GoRx
+* @desc    Entry Rx mode.
+* @return  TRUE or FALSE
+* *********************************************************/
+bool CMT2300A_GoRx(void)
+{
+    return CMT2300A_AutoSwitchStatus(CMT2300A_GO_RX);
+}
+bool CMT2300A_goRX(void)
+{
+    CMT2300A_GoStby();
+    CMT2300A_ClearInterruptFlags();
+    CMT2300A_EnableReadFifo();
+    CMT2300A_ClearRxFifo();
+    return CMT2300A_GoRx();
 }
 bool CMT2300A_Int(void)
 {
+    spi3w.setup();  // IntGPIO(); + cmt_spi3_init();
+
+    CMT2300A_Init();
     if(!CMT2300A_IsExist())
         return false;
 
-    //IntGPIO();
-    //cmt_spi3_init();
-    CMT2300A_Init();
+    IntRegBank();
+    IntRegInterupt();
 
-    //IntRegBank();
-    //IntRegInterupt();
+    pinMode(DEF_GPIO1_PIN, INPUT);
+    
+    attachInterrupt(DEF_GPIO1_PIN, GPIO1_interrupt_callback, RISING);
 
-    //pinMode(CMT2300A_GPIO1_PIN, INPUT);
-    //attachInterrupt(CMT2300A_GPIO1_PIN, GPIO1_interrupt_callback, RISING);
-    /*if(!CMT2300A_goRX())
-        return false;*/
+    if(!CMT2300A_goRX())
+        return false;
     return true;
 }
-
+/*! ********************************************************
+* @name    setup
+* @desc    Initialize the whole libary
+* *********************************************************/
 void setup() {
     Serial.begin(115200);
     Serial.println("Load lib for CMT2300A");
 
     cnt = 0;
     txOk = false;
-    spi3w.setup();
 
-    delay(1000);
+    if(CMT2300A_Int())
+        Serial.println("CMT2300A int ok.");
+    else
+        Serial.println("CMT2300A not init!");
 
-    CMT2300A_Int();
-
-    Serial.println("start");
-
-    // soft reset
-    CMT2300A_SoftReset(); 
-    
-    // go to standby mode
-    if(cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+    if(CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY)) 
         Serial.println("standby mode reached");
 
     spi3w.readReg(CMT2300A_CUS_MODE_STA); // 0x61
     spi3w.writeReg(CMT2300A_CUS_MODE_STA, 0x52);
 
-    if(0x00 != spi3w.readReg(CMT2300A_CUS_EN_CTL))
+    /*if(0x00 != spi3w.readReg(CMT2300A_CUS_EN_CTL))
         Serial.println("CUS_EN_CTL: read error 2");
     spi3w.writeReg(CMT2300A_CUS_EN_CTL, 0x20);
 
     if(0xE0 != spi3w.readReg(CMT2300A_CUS_SYS2))
         Serial.println("error 3");
-    spi3w.writeReg(CMT2300A_CUS_SYS2, 0x00);
+    spi3w.writeReg(CMT2300A_CUS_SYS2, 0x00);*/
 
-/*    uint8_t tmp;
-    tmp = spi3w.readReg(CMT2300A_CUS_MODE_STA);
-    tmp |= CMT2300A_MASK_CFG_RETAIN;         // Enable CFG_RETAIN
-    tmp &= ~CMT2300A_MASK_RSTN_IN_EN;        // Disable RSTN_IN
-    spi3w.writeReg(CMT2300A_CUS_MODE_STA, tmp);
-*/
     /*spi3w.writeReg(CMT2300A_CUS_MODE_STA, 0x52);
 
     tmp  = spi3w.readReg(CMT2300A_CUS_EN_CTL);
     tmp |= CMT2300A_MASK_LOCKING_EN;         // Enable LOCKING_EN
     spi3w.writeReg(CMT2300A_CUS_EN_CTL, tmp);*/
-
-
     ///////////////////
 
-
-    IntRegBank();
-
-    if(0x02 != spi3w.readReg(CMT2300A_CUS_CMT10))
-        Serial.println("error 4");
-    spi3w.writeReg(CMT2300A_CUS_CMT10, 0x02);
-
-    spi3w.writeReg(CMT2300A_CUS_IO_SEL, 0x20);
+    /*spi3w.writeReg(CMT2300A_CUS_IO_SEL, 0x20);
 
     if(0x00 != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
         Serial.println("error 5");
@@ -404,17 +592,9 @@ void setup() {
 
     if(0x00 != spi3w.readReg(CMT2300A_CUS_INT2_CTL))
         Serial.println("error 6");
-    spi3w.writeReg(CMT2300A_CUS_INT2_CTL, 0x07);
+    spi3w.writeReg(CMT2300A_CUS_INT2_CTL, 0x07);*/
 
-    spi3w.writeReg(CMT2300A_CUS_INT_EN, 0x3B);
-
-    spi3w.writeReg(CMT2300A_CUS_PKT10, 0x48);
-    spi3w.writeReg(CMT2300A_CUS_PKT11, 0x5A);
-    spi3w.writeReg(CMT2300A_CUS_PKT12, 0x48);
-    spi3w.writeReg(CMT2300A_CUS_PKT13, 0x4D);
-    spi3w.writeReg(CMT2300A_CUS_PKT15, 0x64);
-
-    if(0x00 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
+    /*if(0x00 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
         Serial.println("error 7");
     spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
 
@@ -428,22 +608,6 @@ void setup() {
         yield();
     }
 
-    spi3w.writeReg(CMT2300A_CUS_RF1, 0x42);
-    spi3w.writeReg(CMT2300A_CUS_RF2, 0xA9);
-    spi3w.writeReg(CMT2300A_CUS_RF3, 0xA4);
-    spi3w.writeReg(CMT2300A_CUS_RF4, 0x8C);
-    spi3w.writeReg(CMT2300A_CUS_RF5, 0x42);
-    spi3w.writeReg(CMT2300A_CUS_RF6, 0x9E);
-    spi3w.writeReg(CMT2300A_CUS_RF7, 0x4B);
-    spi3w.writeReg(CMT2300A_CUS_RF8, 0x1C);
-    spi3w.writeReg(CMT2300A_CUS_RF11, 0x20);
-    spi3w.writeReg(CMT2300A_CUS_RF12, 0x20);
-
-    spi3w.writeReg(CMT2300A_CUS_FSK1, 0xD2);
-    spi3w.writeReg(CMT2300A_CUS_FSK2, 0x35);
-    spi3w.writeReg(CMT2300A_CUS_FSK3, 0x0C);
-    spi3w.writeReg(CMT2300A_CUS_FSK4, 0x0A);
-
     spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x10);
     while(0x51 != spi3w.readReg(CMT2300A_CUS_MODE_STA)) {
         yield();
@@ -452,13 +616,12 @@ void setup() {
     spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x02);
     while(0x52 != spi3w.readReg(CMT2300A_CUS_MODE_STA)) {
         yield();
-    }
+    }*/
 
-    spi3w.writeReg(CMT2300A_CUS_CMT4, 0x1D);
-    spi3w.writeReg(CMT2300A_CUS_TX8, 0x8A);
-    spi3w.writeReg(CMT2300A_CUS_TX9, 0x18);
+    /*spi3w.writeReg(CMT2300A_CUS_TX8, 0x8A);
+    spi3w.writeReg(CMT2300A_CUS_TX9, 0x18);*/
 
-    spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x10);
+    /*spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x10);
     while(0x51 != spi3w.readReg(CMT2300A_CUS_MODE_STA)) {
         yield();
     }
@@ -466,11 +629,14 @@ void setup() {
     spi3w.writeReg(CMT2300A_CUS_MODE_CTL, 0x02);
     while(0x52 != spi3w.readReg(CMT2300A_CUS_MODE_STA)) {
         yield();
-    }
+    }*/
 
     if(0x0A != spi3w.readReg(0x66))
         Serial.println("error 8");
 
+    // Control Bank 2（0x6B – 0x71）
+    /*  Users can operate the Control Bank to achieve the chip working mode switching, IO and interrupt control, FIFO control, Fast
+        Frequency Hopping, RSSI read, etc. The register of Control Bank is used to operate frequently in the application program. */
     spi3w.writeReg(CMT2300A_CUS_INT_FLAG, 0x00);
 
     if(0x00 != spi3w.readReg(CMT2300A_CUS_INT_CLR1))
@@ -478,33 +644,19 @@ void setup() {
     spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
 
     spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+
     if(0x02 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
         Serial.println("error 10");
     spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
+
     spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
-    spi3w.writeReg(CMT2300A_CUS_SYS11, 0x0C);
     spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x01);
 
-    uint8_t cfg0[11] = {
-        0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0xff
-    };
-    uint8_t cfg1[15] = {
-        0x56, UINT32_BYTE_3(wr), UINT32_BYTE_2(wr), UINT32_BYTE_1(wr), UINT32_BYTE_0(wr), UINT32_BYTE_3(wr), UINT32_BYTE_2(wr), UINT32_BYTE_1(wr),
-        UINT32_BYTE_0(wr), 0x02, 0x15, 0x21, 0x0f, 0x14, 0xff
-    };
-    uint8_t cfg2[15] = {
-        0x56, UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu),
-        UINT32_BYTE_0(dtu), 0x01, 0x15, 0x21, 0x0f, 0x14, 0xff
-    };
-    uint8_t cfg3[11] = {
-        0x07, UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu),
-        UINT32_BYTE_0(dtu), 0x00, 0xff
-    };
-    uint8_t cfg4[15] = {
-        0x56, UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu),
-        UINT32_BYTE_0(dtu), 0x01, 0x15, 0x21, 0x21, 0x14, 0xff
-    };
+    uint8_t cfg0[11] = { 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff };
+    uint8_t cfg1[15] = { 0x56, UINT32_BYTE_3(wr), UINT32_BYTE_2(wr), UINT32_BYTE_1(wr), UINT32_BYTE_0(wr), UINT32_BYTE_3(wr), UINT32_BYTE_2(wr), UINT32_BYTE_1(wr), UINT32_BYTE_0(wr), 0x02, 0x15, 0x21, 0x0f, 0x14, 0xff};
+    uint8_t cfg2[15] = { 0x56, UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), 0x01, 0x15, 0x21, 0x0f, 0x14, 0xff};
+    uint8_t cfg3[11] = { 0x07, UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), 0x00, 0xff};
+    uint8_t cfg4[15] = { 0x56, UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), UINT32_BYTE_3(dtu), UINT32_BYTE_2(dtu), UINT32_BYTE_1(dtu), UINT32_BYTE_0(dtu), 0x01, 0x15, 0x21, 0x21, 0x14, 0xff};
     uint8_t i;
 
     cfg0[10] = crc8(cfg0, 10);
@@ -581,7 +733,8 @@ void loop() {
         spi3w.writeReg(CMT2300A_CUS_PKT15, 0x1B);
 
         spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x21); //0x63
-        if(cmtSwitchStatus(CMT2300A_GO_TX, CMT2300A_STA_TX)) {
+        
+        if(CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY)) {
             Serial.println("tx mode ok");
             txOk = true;
 
@@ -600,20 +753,4 @@ void loop() {
             Serial.println("can't switch to tx");
         }
     }
-
-    //if(txOk) {
-        if(cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX)) {
-            //Serial.println("rx mode ok");
-            uint8_t buf[27] = {0};
-            spi3w.readFifo(buf, 27);
-
-            // only print buffer if some fields are not equal 0
-            for(uint8_t i = 0; i < 27; i++) {
-                if(buf[i] != 0) {
-                    dumpBuf("fifo", buf, 27);
-                    break;
-                }
-            }
-        }
-    //}
 }
