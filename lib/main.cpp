@@ -23,7 +23,8 @@
 #define DEF_FCS_PIN			25
 #define DEF_GPIO1_PIN		34  //interupt pin
 
-
+bool isCMT2300ARecived = false;
+uint8_t TPMSpkBuf[50] = {0};
 
 #define CRC8_INIT                       0x00
 #define CRC8_POLY                       0x01
@@ -91,13 +92,13 @@ bool CMT2300A_AutoSwitchStatus(u8 nGoCmd)
             return true;
         
         if(CMT2300A_GO_TX==nGoCmd) {
-            delay(1);
+            delay(100); // standard 1
             if(CMT2300A_MASK_TX_DONE_FLG & spi3w.readReg(CMT2300A_CUS_INT_CLR1))
                 return true;
         }
         
         if(CMT2300A_GO_RX==nGoCmd) {
-            delay(1);
+            delay(100); // standard 1
             if(CMT2300A_MASK_PKT_OK_FLG & spi3w.readReg(CMT2300A_CUS_INT_FLAG))
                 return true;
         }
@@ -495,21 +496,11 @@ void IntRegInterupt()
 }
 void IRAM_ATTR GPIO1_interrupt_callback() 
 {
-	CMT2300A_GoStby();
-    
-	spi3w.readFifo(_buffer, sizeof(_buffer)-1);
+    CMT2300A_GoStby();
+	spi3w.readFifo(TPMSpkBuf, sizeof(TPMSpkBuf) - 5);
 	CMT2300A_ClearInterruptFlags();		
 	CMT2300A_GoSleep();
-
-	txOk = true;
-
-    // only print buffer if some fields are not equal 0
-    for(uint8_t i = 0; i < sizeof(_buffer); i++) {
-        if(_buffer[i] != 0) {
-            dumpBuf("fifo", _buffer, 27);
-            break;
-        }
-    }
+	isCMT2300ARecived=true;
 }
 /*! ********************************************************
 * @name    CMT2300A_GoRx
@@ -543,8 +534,6 @@ bool CMT2300A_Int(void)
     
     attachInterrupt(DEF_GPIO1_PIN, GPIO1_interrupt_callback, RISING);
 
-    if(!CMT2300A_goRX())
-        return false;
     return true;
 }
 /*! ********************************************************
