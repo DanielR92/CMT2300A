@@ -237,7 +237,7 @@ void rxInner(void) {
     if(0x02 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
         spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
 
-    spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
+    //spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
     spi3w.writeReg(0x16, 0x0C);
 
     if(++mLastFreq > 0x22)
@@ -249,18 +249,6 @@ void rxInner(void) {
 
     for(uint8_t i = 0; i < 52; i++) {
         spi3w.readReg(CMT2300A_CUS_INT_FLAG);
-    }
-
-    // is this correct here?
-    uint8_t buf[27] = {0};
-    spi3w.readFifo(buf, 27);
-
-    // only print buffer if some fields are not equal 0
-    for(uint8_t i = 0; i < 27; i++) {
-        if(buf[i] != 0) {
-            dumpBuf("fifo", buf, 27);
-            break;
-        }
     }
 }
 
@@ -299,6 +287,17 @@ void rxData(void) {
         rxInner();
     }
 
+    // is this correct here?
+    uint8_t buf[27] = {0};
+    spi3w.readFifo(buf, 27);
+
+    // only print buffer if some fields are not equal 0
+    for(uint8_t i = 0; i < 27; i++) {
+        if(buf[i] != 0) {
+            dumpBuf("fifo", buf, 27);
+            break;
+        }
+    }
     Serial.println("RSSI: " + String(spi3w.readReg(CMT2300A_CUS_RSSI_DBM)));
 }
 
@@ -362,7 +361,7 @@ void setup() {
     delay(1000);
     Serial.println("start");
 
-    spi3w.writeReg(0x7f, 0xff); // soft reset
+    spi3w.writeReg(0x3f, 0xff); // soft reset
     delay(20);
 
     // go to standby mode
@@ -377,15 +376,13 @@ void setup() {
 
     spi3w.readReg(CMT2300A_CUS_MODE_STA); // 0x61
     spi3w.writeReg(CMT2300A_CUS_MODE_STA, 0x52);
-    if(0x00 != spi3w.readReg(0x62))
-        Serial.println("error 2");
-    spi3w.writeReg(0x62, 0x20);
-    if(0xE0 != spi3w.readReg(0x0D))
-        Serial.println("error 3");
+    if(0x20 != spi3w.readReg(0x62))
+        spi3w.writeReg(0x62, 0x20);
+    if(0x00 != spi3w.readReg(0x0D))
+        spi3w.writeReg(0x0D, 0x00);
 
 
     ///////////////////
-    spi3w.writeReg(0x0D, 0x00);
 
     spi3w.writeReg(0x00, 0x00);
     spi3w.writeReg(0x01, 0x66);
@@ -535,6 +532,9 @@ void setup() {
     spi3w.writeReg(0x25, 0x35);
     spi3w.writeReg(0x26, 0x0C);
     spi3w.writeReg(0x27, 0x0A);
+    spi3w.writeReg(0x28, 0x9F);
+    spi3w.writeReg(0x29, 0x4B);
+    spi3w.writeReg(0x27, 0x0A);
 
     if(!cmtSwitchStatus(CMT2300A_GO_SLEEP, CMT2300A_STA_SLEEP))
         Serial.println("warn: not switched to sleep mode!");
@@ -565,11 +565,29 @@ void setup() {
     // clear interrupts bank2
     spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
     if(0x02 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
-        Serial.println("error 10");
-    spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02); // FIFO_MERGE_EN
-    spi3w.writeReg(0x6C, 0x02);
+        spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02); // FIFO_MERGE_EN
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
     spi3w.writeReg(0x16, 0x0C);
-    spi3w.writeReg(0x63, 0x01);
+    spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x01);
+
+    if(!cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX))
+        Serial.println("warn: cant reach RX mode!");
+
+    spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+
+    if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+        Serial.println("warn: not switched to standby mode!");
+
+    spi3w.readReg(CMT2300A_CUS_INT1_CTL);
+    spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+    spi3w.readReg(CMT2300A_CUS_INT_CLR1);
+    spi3w.readReg(CMT2300A_CUS_INT_CLR2);
+
+    if(0x02 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
+        spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02); // FIFO_MERGE_EN
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
+    spi3w.writeReg(0x16, 0x0C);
+    spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x01);
 
     uint8_t cfg0[11] = {
         0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -610,7 +628,7 @@ void setup() {
 
 //-----------------------------------------------------------------------------
 void loop() {
-    delay(3000);
+    delay(300);
     ts++;
 
     if((++cnt % 5) == 0) {
@@ -622,6 +640,7 @@ void loop() {
         };
         txData(rqst, 27);
     }
+
     rxData();
 
     /*if(cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX)) {

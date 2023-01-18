@@ -1,0 +1,112 @@
+//-----------------------------------------------------------------------------
+// Interface for CMOSTEK CMT2300A (EBYTE E49, RFM300)
+// Lukas Pusch, lukas@lpusch.de, 2023
+//-----------------------------------------------------------------------------
+
+
+
+//-----------------------------------------------------------------------------
+// configuration registers (r/w)
+//-----------------------------------------------------------------------------
+.program spi3w_cfg
+.side_set 2 opt
+    set PINDIRS, 1                      // set SDIO as output
+    pull                                // get 32 bit from FIFO, set SCK to low
+    set y, 1            side 0b00  [1]  // 2 bytes should be transfered
+wrStart:
+    set x, 7                            // set X to 7
+wr:
+    out pins, 1         side 0b00       // output one bit to SDIO
+    jmp x--, wr         side 0b10       // loop 1 byte
+
+    set pins, 1         side 0b00       // set SDIO high
+    out x, 1                            // get R/W bit
+    jmp x--, rdStart                    // R/W = 1: read one byte
+    jmp y--, wrStart                    // R/W = 0: write another byte
+    jmp end
+rdStart:
+    set PINDIRS, 0                      // set SDIO as input
+    set x, 7                            // set X to 7
+rd:
+    in pins, 1          side 0b00       // output one bit to SDIO
+    jmp x--, rd         side 0b10       // loop 1 byte
+    push                side 0b00  [3]  // output data to FIFO
+end:
+    nop                 side 0b01
+
+
+% c-sdk {
+#include "hardware/clocks.h"
+static inline void spi3w_cfg_init(PIO pio, uint sm, uint offset, float clkdiv, uint pin_csb, uint pin_sck, uint pin_sdio) {
+    pio_sm_config c = spi3w_cfg_program_get_default_config(offset);
+
+    pio_gpio_init(pio, pin_csb);
+    pio_gpio_init(pio, pin_sck);
+    pio_gpio_init(pio, pin_sdio);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin_csb, 7, true); // 7 => 0b111
+
+    sm_config_set_out_pins(&c, pin_sdio, 1);
+    sm_config_set_in_pins(&c, pin_sdio);
+    sm_config_set_set_pins(&c, pin_sdio, 1);
+    sm_config_set_sideset_pins(&c, pin_csb);
+
+    sm_config_set_out_shift(&c, false, false, 32);
+    sm_config_set_in_shift(&c, true, true, 32);
+
+    sm_config_set_clkdiv(&c, clkdiv);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
+
+
+//-----------------------------------------------------------------------------
+// fifo (r/w)
+//-----------------------------------------------------------------------------
+.program spi3w_fifo
+.side_set 1 opt                         // MSB to LSB: SCK, CSB, FCSB
+    set PINDIRS, 1                      // set SDIO as output
+    pull
+    out y, 1            side 0          // get R/W bit
+    set x, 7
+    jmp y--, rdStart
+wr:
+    out pins, 1         side 0
+    jmp x--, wr         side 1
+    jmp end             side 0
+rdStart:
+    set PINDIRS, 0                      // set SDIO as output
+rd:
+    in pins, 1          side 0
+    jmp x--, rd         side 1
+    push                side 0
+end:
+    set PINDIRS, 1                      // set SDIO as output
+    set pins, 1         side 0          // set SDIO high
+    nop
+
+
+% c-sdk {
+#include "hardware/clocks.h"
+static inline void spi3w_fifo_init(PIO pio, uint sm, uint offset, float clkdiv, uint pin_sck, uint pin_sdio) {
+    pio_sm_config c = spi3w_fifo_program_get_default_config(offset);
+
+    pio_gpio_init(pio, pin_sck);
+    pio_gpio_init(pio, pin_sdio);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin_sck, 2, true); // 3 => 0b11
+
+    sm_config_set_out_pins(&c, pin_sdio, 1);
+    sm_config_set_in_pins(&c, pin_sdio);
+    sm_config_set_set_pins(&c, pin_sdio, 1);
+    sm_config_set_sideset_pins(&c, pin_sck);
+
+    sm_config_set_out_shift(&c, false, false, 32);
+    sm_config_set_in_shift(&c, true, true, 32);
+
+    sm_config_set_clkdiv(&c, clkdiv);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
