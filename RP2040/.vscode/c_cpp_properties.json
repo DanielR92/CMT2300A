@@ -1,0 +1,105 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
+{
+    "configurations": [
+        {
+            "name": "PlatformIO",
+            "includePath": [
+                "c:/lpusch/github/CMT2300A/RP2040/include",
+                "c:/lpusch/github/CMT2300A/RP2040",
+                "c:/lpusch/github/CMT2300A/RP2040/.pio/libdeps/rp2040/Pin/src",
+                "c:/lpusch/github/CMT2300A/RP2040/.pio/libdeps/rp2040/RPI_PICO_TimerInterrupt/src",
+                "c:/lpusch/github/CMT2300A/RP2040/src",
+                "c:/lpusch/github/CMT2300A/RP2040/lib",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/wizio/pico",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/wizio/newlib",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/SDK/include",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/SDK/cmsis/include",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/arduino",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/cores/RP2040",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/variants/raspberry-pi-pico",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/VFS",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/cmsis-dap",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/fatfs",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/freertos/include",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/freertos/src",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/hal_tft",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/lfs",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/posix/include",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/posix/src",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/DMX",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/EEPROM",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/PWM",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/Pico",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/SPI",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/SerialUSB",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/SoftwareSerial",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/TIMER",
+                "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/Wire",
+                ""
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "c:/lpusch/github/CMT2300A/RP2040/include",
+                    "c:/lpusch/github/CMT2300A/RP2040",
+                    "c:/lpusch/github/CMT2300A/RP2040/.pio/libdeps/rp2040/Pin/src",
+                    "c:/lpusch/github/CMT2300A/RP2040/.pio/libdeps/rp2040/RPI_PICO_TimerInterrupt/src",
+                    "c:/lpusch/github/CMT2300A/RP2040/src",
+                    "c:/lpusch/github/CMT2300A/RP2040/lib",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/wizio/pico",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/wizio/newlib",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/SDK/include",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/SDK/cmsis/include",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/arduino",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/cores/RP2040",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/variants/raspberry-pi-pico",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/VFS",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/cmsis-dap",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/fatfs",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/freertos/include",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/freertos/src",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/hal_tft",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/lfs",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/posix/include",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/library/posix/src",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/DMX",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/EEPROM",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/PWM",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/Pico",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/SPI",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/SerialUSB",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/SoftwareSerial",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/TIMER",
+                    "C:/Users/l.pusch/.platformio/packages/framework-wizio-pico/arduino/libraries/RP2040/Wire",
+                    ""
+                ]
+            },
+            "defines": [
+                "PLATFORMIO=60105",
+                "PICO_CYW43_ARCH_POLL",
+                "NDEBUG",
+                "PICO_ON_DEVICE=1",
+                "PICO_HEAP_SIZE=2048",
+                "PICO_STACK_SIZE=2048",
+                "PICO_WIFI",
+                "ARDUINO=200",
+                ""
+            ],
+            "compilerPath": "C:/Users/l.pusch/.platformio/packages/toolchain-gccarmnoneeabi@1.70201.0/bin/arm-none-eabi-gcc.exe",
+            "compilerArgs": [
+                "-march=armv6-m",
+                "-mcpu=cortex-m0plus",
+                "-mthumb",
+                "-march=armv6-m",
+                "-mcpu=cortex-m0plus",
+                "-mthumb",
+                ""
+            ]
+        }
+    ],
+    "version": 4
+}
