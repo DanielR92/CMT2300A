@@ -205,10 +205,10 @@ void dumpBuf(const char* des, uint8_t buf[], uint8_t len) {
 }
 
 //-----------------------------------------------------------------------------
-bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor, uint16_t cycles = 10) {
+bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor, uint16_t cycles = 50) {
     spi3w.writeReg(CMT2300A_CUS_MODE_CTL, cmd);
     while(cycles--) {
-        delayMicroseconds(1);
+        delayMicroseconds(10);
         if(waitFor == getChipStatus())
             return true;
 
@@ -243,7 +243,7 @@ void rxInner(void) {
     if(0x02 != spi3w.readReg(CMT2300A_CUS_FIFO_CTL))
         spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
 
-    //spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
     spi3w.writeReg(0x16, 0x0C);
 
     if(++mLastFreq > 0x22)
@@ -291,19 +291,19 @@ void rxData(void) {
 
     for(uint8_t i = 0; i < 50; i++) {
         rxInner();
-    }
+        // is this correct here?
+        uint8_t buf[27] = {0};
+        spi3w.readFifo(buf, 27);
 
-    // is this correct here?
-    uint8_t buf[27] = {0};
-    spi3w.readFifo(buf, 27);
-
-    // only print buffer if some fields are not equal 0
-    for(uint8_t i = 0; i < 27; i++) {
-        if(buf[i] != 0) {
-            dumpBuf("fifo", buf, 27);
-            break;
+        // only print buffer if some fields are not equal 0
+        for(uint8_t i = 0; i < 27; i++) {
+            if(buf[i] != 0) {
+                dumpBuf("fifo", buf, 27);
+                break;
+            }
         }
     }
+
     Serial.println("RSSI: " + String(spi3w.readReg(CMT2300A_CUS_RSSI_DBM)));
 }
 
@@ -367,7 +367,9 @@ void setup() {
     delay(1000);
     Serial.println("start");
 
-    spi3w.writeReg(0x3f, 0xff); // soft reset
+    spi3w.writeReg(0x7f, 0xff); // soft reset
+    delay(20);
+    spi3w.writeReg(0x7f, 0xff); // soft reset
     delay(20);
 
     // go to standby mode

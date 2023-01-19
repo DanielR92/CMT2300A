@@ -52,24 +52,29 @@ class RP2040Spi3w {
 
     private:
         inline uint8_t transferCfg(uint8_t addr, uint8_t data) {
-            uint32_t rx;
+            uint32_t rx = 0;
             pio_sm_put_blocking(pio0, 0, (uint32_t)((addr << 24u) | (addr & 0x80) << 16u) | (data << 15u));
-            if(addr & 0x80)
+            if(addr & 0x80) {
                 rx = pio_sm_get_blocking(pio0, 0);
+                //Serial.println(String(addr, HEX) + ": " + String(rx, HEX));
+            }
             sleep_us(12);
-            return (rx >> 24u);
+            return (rx & 0xff); //(rx >> 24u);
         }
 
         inline uint8_t transferFifo(bool read, uint8_t data) {
-            uint32_t rx;
+            uint32_t rx = 0;
             gpio_put(SPI_FCSB, 0);
             pio_sm_put_blocking(pio0, 1, (uint32_t)(((read) ? 0x01 : 0x00) << 31u) | (data << 23u));
-            if(read)
+            if(read) {
                 rx = pio_sm_get_blocking(pio0, 1);
+                if(0 != rx)
+                    Serial.println(String(rx, HEX));
+            }
             sleep_us(5);
             gpio_put(SPI_FCSB, 1);
             sleep_us(7);
-            return (rx >> 24u);
+            return (rx & 0xff); //(rx >> 24u);
         }
 
         PIO mPio;
