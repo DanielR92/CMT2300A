@@ -153,6 +153,8 @@
 #define CRC8_INIT                       0x00
 #define CRC8_POLY                       0x01
 
+#define CRC16_MODBUS_POLYNOM            0xA001
+
 #define U32_B3(val) ((uint8_t)((val >> 24) & 0xff))
 #define U32_B2(val) ((uint8_t)((val >> 16) & 0xff))
 #define U32_B1(val) ((uint8_t)((val >>  8) & 0xff))
@@ -187,6 +189,23 @@ uint8_t crc8(uint8_t buf[], uint8_t len) {
         crc ^= buf[i];
         for(uint8_t b = 0; b < 8; b ++) {
             crc = (crc << 1) ^ ((crc & 0x80) ? CRC8_POLY : 0x00);
+        }
+    }
+    return crc;
+}
+
+//-----------------------------------------------------------------------------
+uint16_t crc16(uint8_t buf[], uint8_t len, uint16_t start) {
+    uint16_t crc = start;
+    uint8_t shift = 0;
+
+    for(uint8_t i = 0; i < len; i ++) {
+        crc = crc ^ buf[i];
+        for(uint8_t bit = 0; bit < 8; bit ++) {
+            shift = (crc & 0x0001);
+            crc = crc >> 1;
+            if(shift != 0)
+                crc = crc ^ CRC16_MODBUS_POLYNOM;
         }
     }
     return crc;
@@ -295,7 +314,7 @@ void rxData(void) {
         uint8_t buf[27] = {0};
         spi3w.readFifo(buf, 27);
 
-        // only print buffer if some fields are not equal 0
+        // only print buffer if one field is not equal 0
         for(uint8_t i = 0; i < 27; i++) {
             if(buf[i] != 0) {
                 dumpBuf("fifo", buf, 27);
@@ -346,7 +365,7 @@ void txData(uint8_t buf[], uint8_t len) {
     spi3w.writeFifo(buf, len);
     dumpBuf("TX", buf, len);
 
-    spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x21);
+    spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, mLastFreq);
 
     if(!cmtSwitchStatus(CMT2300A_GO_TX, CMT2300A_STA_TX, 100))
         Serial.println("warn: cant reach TX mode!");
@@ -599,23 +618,23 @@ void setup() {
 
     uint8_t cfg0[11] = {
         0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0xff
+        0x01, 0x00, 0xff
     };
     uint8_t cfg1[15] = {
-        0x56, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(wr), U32_B2(wr), U32_B1(wr),
-        U32_B0(wr), 0x02, 0x15, 0x21, 0x0f, 0x14, 0xff
+        0x56, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), 0x00, 0x00, 0x00,
+        0x01, 0x02, 0x15, 0x21, 0x0c, 0x14, 0xff
     };
     uint8_t cfg2[15] = {
-        0x56, U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
-        U32_B0(dtu), 0x01, 0x15, 0x21, 0x0f, 0x14, 0xff
+        0x56, U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu), 0x00, 0x00, 0x00,
+        0x01, 0x01, 0x15, 0x21, 0x0c, 0x14, 0xff
     };
     uint8_t cfg3[11] = {
-        0x07, U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
-        U32_B0(dtu), 0x00, 0xff
+        0x07, U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu), 0x00, 0x00, 0x00,
+        0x01, 0x00, 0xff
     };
     uint8_t cfg4[15] = {
-        0x56, U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
-        U32_B0(dtu), 0x01, 0x15, 0x21, 0x21, 0x14, 0xff
+        0x56, U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu), 0x00, 0x00, 0x00,
+        0x01, 0x01, 0x15, 0x21, 0x21, 0x14, 0xff
     };
 
 
@@ -628,7 +647,7 @@ void setup() {
     txData(cfg3, 11);
     txData(cfg4, 15);
     txData(cfg2, 15);
-    for(uint8_t i = 0; i < 5; i++) {
+    for(uint8_t i = 0; i < 3; i++) {
         txData(cfg1, 15);
     }
     txData(cfg2, 15);
@@ -636,16 +655,24 @@ void setup() {
 
 //-----------------------------------------------------------------------------
 void loop() {
-    delay(300);
-    ts++;
+    delay(50);
 
-    if((++cnt % 5) == 0) {
+    if((++cnt % 20) == 0) { // each second
+        ts++;
         uint8_t rqst[27] = {
             0x15, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), 0x00, 0x00, 0x00,
             0x01, 0x80, 0x0B, 0x00, U32_B3(ts), U32_B2(ts), U32_B1(ts), U32_B0(ts),
-            0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00,
-            0x88, 0x90, 0xff
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xff, 0xff, 0xff
         };
+        uint16_t crc = crc16(&rqst[10], 14, 0xffff);
+        rqst[24] = (crc >> 8) & 0xff;
+        rqst[25] = (crc     ) & 0xff;
+
+        txData(rqst, 27);
+        delayMicroseconds(100);
+        txData(rqst, 27);
+        delayMicroseconds(100);
         txData(rqst, 27);
     }
 
