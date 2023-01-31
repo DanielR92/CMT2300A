@@ -34,12 +34,15 @@ uint32_t wr  = 0x80724087;  // me - 116480724087
 #define U32_B0(val) ((uint8_t)((val      ) & 0xff))
 
 void dumpBuf(const char* des, uint8_t buf[], uint8_t len) {
+    char dataString[50] = {0};
+
     Serial.println("------------------");
     Serial.print(String(des));
     for(uint8_t i = 0; i < len; i++) {
         if((0 != i) && (i % 8 == 0))
             Serial.print("");
-        Serial.print(String(buf[i], HEX) + " ");
+        sprintf(dataString,"%02X ",buf[i]);    
+        Serial.print(dataString);
     }
     Serial.println("");
 }
