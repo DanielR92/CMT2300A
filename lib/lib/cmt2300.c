@@ -217,6 +217,7 @@ void CMT2300A_FastFreqSwitch(void)
 {
     CMT2300A_WriteReg(CMT2300A_CUS_FREQ_CHNL, ++man_freq_hop);
     if (man_freq_hop == 2) man_freq_hop = 0;
+    delay(100);
 }
 
 void IntRegInterupt()
