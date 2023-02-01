@@ -7,10 +7,18 @@
 #include "rp2040.h"
 //#include "softSpi3w.h"
 
-#define DEF_CS_PIN                      16 // D0 - GPIO16
-#define DEF_FCS_PIN                     2  // D4 - GPIO2
-#define DEF_SCK_PIN                     14 // D5 - GPIO14
-#define DEF_SDIO_PIN                    12 // D6 - GPIO12
+#if defined(ESP32)
+    #define DEF_SCK_PIN         32
+    #define DEF_SDIO_PIN        12
+    #define DEF_CS_PIN          27
+    #define DEF_FCS_PIN         25
+#else // 8266
+    #define DEF_GPIO1_PIN     34  //interupt pin
+    #define DEF_CS_PIN                      16 // D0 - GPIO16
+    #define DEF_FCS_PIN                     2  // D4 - GPIO2
+    #define DEF_SCK_PIN                     14 // D5 - GPIO14
+    #define DEF_SDIO_PIN                    12 // D6 - GPIO12
+#endif
 
 #ifdef RP2040
 #define CMT_GPIO3                       6
