@@ -129,15 +129,15 @@ void setup() {
 //-----------------------------------------------------------------------------
 void loop() {
     delay(500);
-    /*uint8_t rqst[27] = {
+    uint8_t rqst[27] = {
         0x15, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(wr), U32_B2(wr), U32_B1(wr),
         U32_B0(wr), 0x80, 0x0B, 0x00, U32_B3(ts), U32_B2(ts), U32_B1(ts), U32_B0(ts),
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0xff
     };
+    //wrbuf(rqst, 27, true, true);
+    // delay(200);
     wrbuf(rqst, 27, true, true);
-    delay(200);
-    wrbuf(rqst, 27, true, true);
-    delay(300);*/
+    delay(1500);
     ts++;
 }
