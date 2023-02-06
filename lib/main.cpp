@@ -21,9 +21,9 @@ uint16_t cnt;
 uint8_t mLastFreq = 0;
 
 // config
-uint32_t ts  = 1675151493; // timestamp
-uint32_t dtu = 0x83266790;
-uint32_t wr  = 0x80724087;  // me - 116480724087
+uint32_t ts  = 1675269384; // timestamp
+uint32_t dtu = 0x81001765;
+uint32_t wr  = 0x80724087;  // me - 1164 80724087
             // 0x80423810   // lumapu
             
 // end config
@@ -79,23 +79,45 @@ void setup() {
 uint8_t time_s = 1;
 String arr[] = {"PUP", "SLEEP", "STBY", "RFS", "TFS", "RX", "TX", "EEPROM", "ERROR", "CAL"};
 
+/* RealTimeRunData_Debug 0x0B HMS-2000:
+
+TX 15 80423810 81001765 80 0B00 6384 DE99 0000 0000 0000 0000 B63A AB
+   ^^----------------------------------------------------------------- MainCmd 0x15 REQ_ARW_DAT_ALL
+      ^^^^^^^^-------------------------------------------------------- WR Serial ID
+               ^^^^^^^^----------------------------------------------- DTU Serial ID
+                        ^^-------------------------------------------- MultiFrameID 0x80 = SingleFrame
+                           ^^----------------------------------------- SubCmd bzw. DataType: 0x0B = RealTimeRunData_Debug, 0x0C RealTimeRunData_Reality
+                             ^^--------------------------------------- rev Protocol Revision ?
+                           ^^^^--------------------------------------- Control Mode ? immer zwei Byte im Gen3 Protokoll
+                                ^^^^ ^^^^----------------------------- UNIX timestamp
+                                          ^^^^------------------------ Gap always 0x0000
+                                               ^^^^------------------- 0x0000, nur bei AlarmData: WarnSerNub (Warning Serial Number)
+                                                    ^^^^ ^^^^--------  Password always 0x00000000
+                                                              ^^^^---- CRC16 / CRC-Modbus über die UserData, excl. Frame ID!
+                                                                   ^^- CRC8 
+*/
+
+/* TODO: SOF, EOF und die Escape Sequenz (7D) selbst escapen
+7D => 7D5D
+7E => 7D5E
+7F => 7D5F
+*/
+
 void loop() {
-    CMT2300A_FastFreqSwitch();
-    delay(time_s * 1000);
+    //CMT2300A_FastFreqSwitch();
+    delay(time_s * 5000);
     ts += time_s;
     
-
     if(CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY)) {
-        uint8_t rqst[27] = { 0x15,                              // MainCmd 0x15 REQ_ARW_DAT_ALL
+        uint8_t rqst[] = { 0x15,                              // MainCmd 0x15 REQ_ARW_DAT_ALL
             U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr),     // WR Serial ID
-            U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr),     // WR Serial ID
+            U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu),     // WR Serial ID
             0x80,                                                                           // MultiFrameID 0x80 = SingleFrame
             0x0B,                                                                           // SubCmd bzw. DataType: 0x0B = RealTimeRunData_Debug, 0x0C RealTimeRunData_Reality
             0x00,                                                                           // rev Protocol Revision ?
             U32_B3(ts), U32_B2(ts), U32_B1(ts), U32_B0(ts),     // UNIX timestamp
-            0x00, 0x00, 0x00, 
-            0x04, 
-            0x00, 0x00, 0x00, 0x00, 
+            0x00, 0x00, 0x00, 0x04, 
+            0x00, 0x00, 0x00, 0x00,
             //
             0xFF, 0xCC,                                                                     // CRC16
             0x00                                                                            // CRC8
@@ -107,26 +129,25 @@ void loop() {
 
         rqst[sizeof(rqst)-1] = crc8(rqst, sizeof(rqst)-1);
 
-        CMT2300A_EnableWriteFifo();
-        //CMT2300A_WriteFifo(rqst, sizeof(rqst));
+        CMT2300A_goTX();
         CMT2300A_WriteFifo(rqst, sizeof(rqst));
-        CMT2300A_GoTx();
+
         dumpBuf("tx: ", rqst, sizeof(rqst));
         CMT2300A_ClearTxFifo();
     }
 
-    CMT2300A_goRX();
-    Serial.print("ChipStatus: "); Serial.println(arr[CMT2300A_GetChipStatus()]);
-    Serial.print("RSSI: "); Serial.println(CMT2300A_GetRssiDBm());
+    if(CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY)) {
+        CMT2300A_goRX();
+        Serial.print("ChipStatus: "); Serial.println(arr[CMT2300A_GetChipStatus()]);
+        Serial.print("RSSI: "); Serial.println(CMT2300A_GetRssiDBm());
 
-    if(isCMT2300ARecived) {
-        isCMT2300ARecived=false;
-        Serial.println("rx packets?");
-        CMT2300A_ReadFifo(TPMSpkBuf, 10);
-        CMT2300A_ClearRxFifo();
-        Serial.printf("%c", TPMSpkBuf);
-        Serial.println();
-
-        //CMT2300A_GoStby();
+        if(isCMT2300ARecived) {
+            isCMT2300ARecived=false;
+            Serial.println("rx packets?");
+            CMT2300A_ReadFifo(TPMSpkBuf, 10);
+            CMT2300A_ClearRxFifo();
+            Serial.printf("%c", TPMSpkBuf);
+            Serial.println();
+        }
     }
 }

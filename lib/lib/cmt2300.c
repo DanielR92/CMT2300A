@@ -223,28 +223,30 @@ void CMT2300A_FastFreqSwitch(void)
 void IntRegInterupt()
 {
 	CMT2300A_ConfigGpio
-	(
-		CMT2300A_GPIO1_SEL_INT1 | /* INT1 > GPIO1 */
-		CMT2300A_GPIO2_SEL_INT2 | /* INT2 > GPIO2 */
-		CMT2300A_GPIO3_SEL_DOUT
+	( // Todo?
+        CMT2300A_GPIO1_SEL_INT2 | 
+        CMT2300A_GPIO3_SEL_DCLK
+		//CMT2300A_GPIO1_SEL_INT1 | /* INT1 > GPIO1 */
+		//CMT2300A_GPIO2_SEL_INT2 | /* INT2 > GPIO2 */
+		//CMT2300A_GPIO3_SEL_DOUT
 	);
     CMT2300A_ConfigInterrupt
 	(
-		CMT2300A_INT_SEL_PKT_OK,  /* INT1 为接收完成*/
-        CMT2300A_INT_SEL_TX_DONE  /* INT2 为发送完成*/
+        CMT2300A_INT_SEL_TX_DONE, /* INT1 Zum Versenden ausgefüllt*/
+		CMT2300A_INT_SEL_PKT_OK  /* INT2 komplett für den Empfang*/
 	);
     CMT2300A_EnableInterrupt
 	(
-		CMT2300A_MASK_TX_DONE_EN  |
-		CMT2300A_MASK_PREAM_OK_EN |
-		CMT2300A_MASK_SYNC_OK_EN  |
-		CMT2300A_MASK_NODE_OK_EN  |
-		CMT2300A_MASK_CRC_OK_EN   |
-		CMT2300A_MASK_PKT_DONE_EN
+		CMT2300A_MASK_TX_DONE_EN  | // 20
+		CMT2300A_MASK_PREAM_OK_EN | // 10
+		CMT2300A_MASK_SYNC_OK_EN  | // 08
+		//CMT2300A_MASK_NODE_OK_EN  | // 04
+		CMT2300A_MASK_CRC_OK_EN   | // 2
+		CMT2300A_MASK_PKT_DONE_EN   // 1
 	);
 
-    CMT2300A_EnableLfosc(false);///* Disable low frequency OSC calibration */ 
-    CMT2300A_GoSleep(); /* Go to sleep for configuration to take effect */
+    CMT2300A_EnableLfosc(false);    ///* Disable low frequency OSC calibration */ 
+    CMT2300A_GoSleep();             /* Go to sleep for configuration to take effect */
 }
 
 void IRAM_ATTR GPIO1_interrupt_callback() 
@@ -280,6 +282,15 @@ bool CMT2300A_goRX(void)
     CMT2300A_EnableReadFifo();
     CMT2300A_ClearRxFifo();
     return CMT2300A_GoRx();
+}
+
+bool CMT2300A_goTX(void)
+{
+    CMT2300A_GoStby();
+    CMT2300A_ClearInterruptFlags();
+    CMT2300A_EnableWriteFifo();
+    CMT2300A_ClearTxFifo();
+    return CMT2300A_GoTx();
 }
 
 bool CMT2300A_goSleep(void)

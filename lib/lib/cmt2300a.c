@@ -84,7 +84,6 @@ BOOL CMT2300A_AutoSwitchStatus(u8 nGoCmd)
         
         if(CMT2300A_GO_TX==nGoCmd) {
             drv_delay_ms(1);
-            
             if(CMT2300A_MASK_TX_DONE_FLG & CMT2300A_ReadReg(CMT2300A_CUS_INT_CLR1))
                 return true;
         }

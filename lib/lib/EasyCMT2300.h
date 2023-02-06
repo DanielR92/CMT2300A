@@ -43,6 +43,7 @@ void IntRegBank(void);
 void IntRegInterupt(void);
 bool CMT2300A_Int(void);
 bool CMT2300A_goRX(void);
+bool CMT2300A_goTX(void);
 bool CMT2300A_goSleep(void);
 void CMT2300A_FastFreqSwitch(void);
 #ifdef __cplusplus 
