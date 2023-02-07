@@ -15,7 +15,9 @@
 #define SPI_SCK         4
 #define SPI_SDIO        5
 
-#define CSB_MANUAL
+#define PIN_RX_IRQ      6
+
+//#define CSB_MANUAL
 
 class RP2040Spi3w {
     public:
@@ -31,6 +33,9 @@ class RP2040Spi3w {
                 gpio_put(SPI_CSB, 1);
             #endif
 
+            // typedef void(* gpio_irq_callback_t) (uint gpio, uint32_t event_mask)
+            //gpio_set_irq_enabled_with_callback(PIN_RX_IRQ, GPIO_IRQ_EDGE_RISE, true, &gpioCallback);
+
             #ifdef CSB_MANUAL
                 uint offset_cfg  = pio_add_program(mPio, &spi3w_cfg2_program);
                 spi3w_cfg2_init(mPio, 0, offset_cfg, 14.0f, SPI_SCK, SPI_SDIO);
@@ -43,6 +48,17 @@ class RP2040Spi3w {
 
             /*for(uint16_t i = 0; i < 65500; i++) {
                 transferFifo(((i & 0x01) == 0x01), (i >> 1) & 0xff);
+            }*/
+            /*int j = 0;
+
+            while(1) {
+                for(uint16_t i = 0; i < 256; i++) {
+                    writeReg((j+i) ^0xa4, (j+i) & 0xff);
+                }
+                for(uint8_t i = 0; i < 15; i++)
+                    transferFifo(false, j & 0xff);
+
+                j++;
             }*/
         }
 
