@@ -118,7 +118,7 @@ class RP2040Spi3w {
                 sleep_us(5);
 
             gpio_put(SPI_FCSB, 1);
-            sleep_us(1);
+            sleep_us(4);
             return (rx & 0xff); //(rx >> 24u);
         }
 

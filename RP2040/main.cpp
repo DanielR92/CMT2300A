@@ -343,25 +343,30 @@ int8_t checkRx() {
         }
 
         #ifdef RP2040
-        uint16_t timeout = 5000;
-        while(0x18 != state) {
-            state = spi3w.readReg(CMT2300A_CUS_INT_FLAG);
-            if(0 == timeout--) {
-                //Serial.println("state timeout");
-                break;
+        if((state & 0x10) == 0x10) {
+            uint16_t timeout = 5000;
+            while(0 == gpio_get(CMT_GPIO3)) {
+                usleep(10);
+                if(0 == --timeout) {
+                    //Serial.println("GPIO timeout");
+                    break;
+                }
             }
-        }
-        timeout = 5000;
-        while(0 == gpio_get(CMT_GPIO3)) {
-            usleep(10);
-            if(0 == --timeout) {
-                //Serial.println("GPIO timeout");
-                break;
+            if(0 != timeout) {
+                uint16_t timeout2 = 5000;
+                while(0x18 != (state & 0x18)) {
+                    state = spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+                    if(0 == timeout2--) {
+                        //Serial.println("state timeout");
+                        break;
+                    }
+                }
             }
         }
         #endif
 
-        if(0x00 != state) {
+
+        if(0 != gpio_get(CMT_GPIO3)) {
             uint32_t loops = 0;
             while((state & 0x1b) != 0x1b) {
                 state = spi3w.readReg(CMT2300A_CUS_INT_FLAG);
@@ -385,6 +390,7 @@ int8_t checkRx() {
             }
         }
 
+
         // receive ok (pream, sync, node, crc)
         uint8_t buf[27] = {0};
         if((state & 0x1b) == 0x1b) {
@@ -399,10 +405,10 @@ int8_t checkRx() {
                 Serial.println("warn: not switched to sleep mode!");
         }
 
-        if(0 != timeout)
-            Serial.println("RX DONE!!! RSSI: " + String(rssi) + " remain cnt: " + String(timeout));
+        //if(0 != timeout)
+        //    Serial.println("RX DONE!!! RSSI: " + String(rssi) + " remain cnt: " + String(timeout));
 
-        if((state & 0x1b) == 0x1b) {
+        /*if((state & 0x1b) == 0x1b) {
             // only print buffer if one field is not equal 0
             Serial.println("mLastFreq: " + String(mLastFreq, HEX));
             for(uint8_t i = 0; i < 27; i++) {
@@ -412,7 +418,7 @@ int8_t checkRx() {
                     break;
                 }
             }
-        }
+        }*/
     }
 
 
