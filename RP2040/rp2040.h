@@ -109,7 +109,7 @@ class RP2040Spi3w {
             gpio_put(SPI_FCSB, 0);
             sleep_us(2);
             pio_sm_clear_fifos(mPio, 1);
-            pio_sm_put_blocking(mPio, 1, (uint32_t)(((read) ? 0x00 : 0x03) << 30u) | (data << 23u));
+            pio_sm_put_blocking(mPio, 1, (uint32_t)(((read) ? 0x00 : 0x03) << 30u) | (data << 22u));
             if(read) {
                 rx = pio_sm_get_blocking(mPio, 1);
                 sleep_us(2);

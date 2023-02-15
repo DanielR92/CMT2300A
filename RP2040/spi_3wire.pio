@@ -125,6 +125,7 @@ static inline void spi3w_cfg2_init(PIO pio, uint sm, uint offset, float clkdiv, 
     pull
     out y, 1                            // get R/W bit
     out PINDIRS, 1      side 0          // set SDIO as in-/output
+    set PINDIRS, 0
     set x, 7
     jmp y--, wr
 rd:

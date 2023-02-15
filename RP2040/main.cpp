@@ -228,15 +228,16 @@ uint16_t crc16(uint8_t buf[], uint8_t len, uint16_t start) {
 }
 
 //-----------------------------------------------------------------------------
-void dumpBuf(const char* des, uint8_t buf[], uint8_t len) {
-    Serial.println("------------------");
-    Serial.println(String(des));
+void dumpBuf(const char* des, uint8_t buf[], uint8_t len, bool newline = true) {
+    //Serial.println("------------------");
+    Serial.print(String(des));
     for(uint8_t i = 0; i < len; i++) {
-        if((0 != i) && (i % 8 == 0))
+        if((0 != i) && (i % 32 == 0))
             Serial.println("");
-        Serial.print(String(buf[i], HEX) + " ");
+        Serial.print(" " + String(buf[i], HEX));
     }
-    Serial.println("");
+    if(newline)
+        Serial.println("");
 }
 
 //-----------------------------------------------------------------------------
@@ -244,7 +245,7 @@ bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor, uint16_t cycles = 50000) {
     spi3w.writeReg(CMT2300A_CUS_MODE_CTL, cmd);
     while(cycles--) {
         delayMicroseconds(10);
-        if(waitFor == getChipStatus())
+        if(waitFor == (getChipStatus() & waitFor))
             return true;
     }
     Serial.println("status wait for: " + String(waitFor, HEX) + " read: " + String(getChipStatus(), HEX));
@@ -308,34 +309,36 @@ int8_t checkRx() {
     spi3w.readReg(CMT2300A_CUS_INT1_CTL);
     spi3w.writeReg(CMT2300A_CUS_INT1_CTL, CMT2300A_INT_SEL_TX_DONE);
 
-    //if(0x00 == spi3w.readReg(CMT2300A_CUS_INT_FLAG))
-    spi3w.readReg(CMT2300A_CUS_INT_FLAG);
-    {
-        // no data received
-        uint8_t tmp = spi3w.readReg(CMT2300A_CUS_INT_CLR1);
-        if(0x08 == tmp) // first time after TX this reg is 0x08
-            spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x04);
-        else
-            spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
+        //if(0x00 == (spi3w.readReg(CMT2300A_CUS_INT_FLAG) & 0x0f))
+        //spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+        {
+            // no data received
+            uint8_t tmp = spi3w.readReg(CMT2300A_CUS_INT_CLR1);
+            if(0x08 == tmp) // first time after TX this reg is 0x08
+                spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x04);
+            else
+                spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
 
-        if(0x10 == tmp)
-            spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x10);
-        else
-            spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+            if(0x10 == tmp)
+                spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x10);
+            else
+                spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
 
-        spi3w.readReg(CMT2300A_CUS_FIFO_CTL); // necessary? -> if 0x02 last was read
-                                              //                  0x07 last was write
-        spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
+            spi3w.readReg(CMT2300A_CUS_FIFO_CTL); // necessary? -> if 0x02 last was read
+                                                  //                  0x07 last was write
+            spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
 
-        spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
-        spi3w.writeReg(0x16, 0x0C); // [4:3]: RSSI_DET_SEL, [2:0]: RSSI_AVG_MODE
+            spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
+            spi3w.writeReg(0x16, 0x0C); // [4:3]: RSSI_DET_SEL, [2:0]: RSSI_AVG_MODE
 
-        switchFreq();
+            switchFreq();
 
-        if(!cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX))
-            Serial.println("warn: cant reach RX mode!");
+            if(!cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX))
+                Serial.println("warn: cant reach RX mode!");
+        }
 
         uint8_t state = 0x00;
+            uint16_t timeout = 5000;
         for(uint8_t i = 0; i < 52; i++) {
             state = spi3w.readReg(CMT2300A_CUS_INT_FLAG);
             if(0x00 != state)
@@ -344,7 +347,6 @@ int8_t checkRx() {
 
         #ifdef RP2040
         if((state & 0x10) == 0x10) {
-            uint16_t timeout = 5000;
             while(0 == gpio_get(CMT_GPIO3)) {
                 usleep(10);
                 if(0 == --timeout) {
@@ -405,21 +407,22 @@ int8_t checkRx() {
                 Serial.println("warn: not switched to sleep mode!");
         }
 
-        //if(0 != timeout)
-        //    Serial.println("RX DONE!!! RSSI: " + String(rssi) + " remain cnt: " + String(timeout));
-
-        /*if((state & 0x1b) == 0x1b) {
+        /*if(0 != timeout)
+            Serial.println("RX DONE!!! RSSI: " + String(rssi) + " remain cnt: " + String(timeout));
+*/
+        if((state & 0x1b) == 0x1b) {
             // only print buffer if one field is not equal 0
-            Serial.println("mLastFreq: " + String(mLastFreq, HEX));
+            //Serial.println("mLastFreq: " + String(mLastFreq, HEX));
             for(uint8_t i = 0; i < 27; i++) {
                 if(buf[i] != 0) {
-                    dumpBuf("RX", buf, 27);
+                    dumpBuf("RX", buf, 27, false);
                     mFound = true;
                     break;
                 }
             }
-        }*/
-    }
+            Serial.println(", RSSI: " + String(rssi));
+        }
+    //}
 
 
     if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
@@ -709,7 +712,7 @@ void setup() {
     Serial.begin(115200);
     cnt        = 0;
     mStartFreq = 0x00;
-    mEndFreq   = 0x0F;
+    mEndFreq   = 0x00;
     mLastFreq  = mStartFreq;
     mFound     = false;
     spi3w.setup();
@@ -751,18 +754,18 @@ void loop() {
         mPrevMillis = millis();
         cnt++;
 
-        Serial.println("#" + String(cnt) + ": ");
+        //Serial.println("#" + String(cnt) + ": ");
         if(!mFound) {
             if(((cnt % 10) == 0) || (cnt < 28)) {
                 uint8_t cfg1[15] = {
                     0x56, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
                     U32_B0(dtu), 0x02, 0x15, 0x21, 0x0f, 0x14, 0x62
                 };
-                txData(cfg1, 15, false, true, mTxVerify);
+                //txData(cfg1, 15, false, true, mTxVerify);
                 checkRx();
                 checkRx();
                 checkRx();
-                txData(cfg1, 15, false, true, mTxVerify);
+                //txData(cfg1, 15, false, true, mTxVerify);
                 mTxVerify = false;
             }
         }
@@ -777,11 +780,11 @@ void loop() {
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00
             };
-            txData(rqst, 27);
+            //txData(rqst, 27);
             checkRx();
             checkRx();
             checkRx();
-            txData(rqst, 27);
+            //txData(rqst, 27);
             ts++;
         }
 
@@ -801,7 +804,7 @@ void loop() {
             }
         }*/
     }
-    if(cnt == 5)
-        resetCMT();
+    //if(cnt == 5)
+    //    resetCMT();
     checkRx();
 }
