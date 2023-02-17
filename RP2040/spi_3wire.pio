@@ -120,12 +120,9 @@ static inline void spi3w_cfg2_init(PIO pio, uint sm, uint offset, float clkdiv, 
 //-----------------------------------------------------------------------------
 .program spi3w_fifo
 .side_set 1 opt                         // MSB to LSB: SCK, CSB, FCSB
-//    set PINDIRS, 1                      // set SDIO as output
-//    set pins, 0                         // set SDIO low
     pull
     out y, 1                            // get R/W bit
     out PINDIRS, 1      side 0          // set SDIO as in-/output
-    set PINDIRS, 0
     set x, 7
     jmp y--, wr
 rd:
@@ -139,7 +136,6 @@ wr:
     jmp end             side 0
 end:
     set PINDIRS, 1      side 0            // set SDIO as output
-//    set pins, 1         side 0          // set SDIO high
     nop
 
 
@@ -151,6 +147,9 @@ static inline void spi3w_fifo_init(PIO pio, uint sm, uint offset, float clkdiv, 
     pio_gpio_init(pio, pin_sck);
     pio_gpio_init(pio, pin_sdio);
     pio_sm_set_consecutive_pindirs(pio, sm, pin_sck, 2, true); // 3 => 0b11
+
+    uint32_t mask = (1u << pin_sdio);
+    pio_sm_set_pindirs_with_mask(pio, sm, mask, mask);
 
     sm_config_set_out_pins(&c, pin_sdio, 1);
     sm_config_set_in_pins(&c, pin_sdio);

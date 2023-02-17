@@ -187,7 +187,7 @@ uint32_t mPrevMillis;
 bool mTxVerify;
 
 // config
-uint32_t ts  = 1675597502; //0x6384DF00; // timestamp
+uint32_t ts  = 1676648114; // timestamp
 uint32_t dtu = 0x83266790; //0x81001756; // ;
 uint32_t wr  = 0x80423810;
 // end config
@@ -234,7 +234,10 @@ void dumpBuf(const char* des, uint8_t buf[], uint8_t len, bool newline = true) {
     for(uint8_t i = 0; i < len; i++) {
         if((0 != i) && (i % 32 == 0))
             Serial.println("");
-        Serial.print(" " + String(buf[i], HEX));
+        if(buf[i] < 16)
+            Serial.print(" 0" + String(buf[i], HEX));
+        else
+            Serial.print(" " + String(buf[i], HEX));
     }
     if(newline)
         Serial.println("");
@@ -394,12 +397,12 @@ int8_t checkRx() {
 
 
         // receive ok (pream, sync, node, crc)
-        uint8_t buf[27] = {0};
+        uint8_t buf[28] = {0};
         if((state & 0x1b) == 0x1b) {
             if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
                 Serial.println("warn: not switched to standby mode!");
 
-            spi3w.readFifo(buf, 27);
+            spi3w.readFifo(buf, 28);
 
             rssi = spi3w.readReg(CMT2300A_CUS_RSSI_DBM) - 128;
 
@@ -411,16 +414,22 @@ int8_t checkRx() {
             Serial.println("RX DONE!!! RSSI: " + String(rssi) + " remain cnt: " + String(timeout));
 */
         if((state & 0x1b) == 0x1b) {
-            // only print buffer if one field is not equal 0
             //Serial.println("mLastFreq: " + String(mLastFreq, HEX));
-            for(uint8_t i = 0; i < 27; i++) {
-                if(buf[i] != 0) {
-                    dumpBuf("RX", buf, 27, false);
-                    mFound = true;
-                    break;
-                }
+            dumpBuf("RX", &buf[1], 27, false);
+
+            //Serial.print(", RSSI: " + String(rssi));
+
+            uint8_t len = buf[0] + 1;
+            buf[len-0] = 0x00;
+            if(buf[0] == 0x1b) {
+                buf[len-2] = 0x00;
+                buf[len-1] = 0x00;
+                uint16_t crc2 = crc16(&buf[11], len-13, 0xffff);
+                Serial.print(", crc16: " + String(crc2, HEX));
+                buf[len-3] = (crc2 >> 8 & 0xff);
+                buf[len-2] = (crc2      & 0xff);
             }
-            Serial.println(", RSSI: " + String(rssi));
+            Serial.println(", crc8: " + String(crc8(&buf[1], len-1), HEX));
         }
     //}
 
@@ -444,8 +453,7 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
     }
     if(calcCrc8)
         buf[len-1] = crc8(buf, len-1);
-    //dumpBuf("TX", buf, len);
-
+    dumpBuf("TX", buf, len);
 
     // verify that write pipe is empty
     if(verify == true) {
@@ -756,55 +764,26 @@ void loop() {
 
         //Serial.println("#" + String(cnt) + ": ");
         if(!mFound) {
-            if(((cnt % 10) == 0) || (cnt < 28)) {
+            if(cnt < 5) {
                 uint8_t cfg1[15] = {
                     0x56, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
                     U32_B0(dtu), 0x02, 0x15, 0x21, 0x0f, 0x14, 0x62
                 };
                 //txData(cfg1, 15, false, true, mTxVerify);
-                checkRx();
-                checkRx();
-                checkRx();
-                //txData(cfg1, 15, false, true, mTxVerify);
                 mTxVerify = false;
             }
         }
 
-        if(cnt >= 28) {
-            if((!mFound) && ((cnt % 10) == 0))
-                return;
-
+        if(((ts % 2) == 0) && (cnt > 5)) {
             uint8_t rqst[27] = {
                 0x15, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
                 U32_B0(dtu), 0x80, 0x0B, 0x00, U32_B3(ts), U32_B2(ts), U32_B1(ts), U32_B0(ts),
-                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x1C, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00
             };
-            //txData(rqst, 27);
-            checkRx();
-            checkRx();
-            checkRx();
-            //txData(rqst, 27);
-            ts++;
+            txData(rqst, 27);
         }
-
-        /*if(!mFound) {
-            //if(cnt == 30)
-            //    freqSetting(1);
-
-            if(cnt % 10 == 0) {
-                if(cnt % 5 == 0) {
-                    mStartFreq = 0x0E;
-                    mEndFreq = 0x10;
-                }
-                else {
-                    mStartFreq = 0x20;
-                    mEndFreq = 0x22;
-                }
-            }
-        }*/
+        ts++;
     }
-    //if(cnt == 5)
-    //    resetCMT();
     checkRx();
 }
