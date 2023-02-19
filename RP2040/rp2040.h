@@ -17,6 +17,8 @@
 
 #define PIN_RX_IRQ      6
 
+#define INTR_PIN        6
+
 //#define CSB_MANUAL
 
 class RP2040Spi3w {
@@ -60,6 +62,8 @@ class RP2040Spi3w {
 
                 j++;
             }*/
+            gpio_init(INTR_PIN);
+            gpio_set_dir(INTR_PIN, false); // INPUT
         }
 
         void writeReg(uint8_t addr, uint8_t reg) {

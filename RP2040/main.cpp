@@ -4,24 +4,10 @@
 //-----------------------------------------------------------------------------
 
 #include <Arduino.h>
+#ifdef ESP32
+#include "esp32_3wSpi.h"
+#else
 #include "rp2040.h"
-//#include "softSpi3w.h"
-
-#if defined(ESP32)
-    #define DEF_SCK_PIN         32
-    #define DEF_SDIO_PIN        12
-    #define DEF_CS_PIN          27
-    #define DEF_FCS_PIN         25
-    #define DEF_GPIO1_PIN       34 // interupt pin
-#else // 8266
-    #define DEF_CS_PIN          16 // D0 - GPIO16
-    #define DEF_FCS_PIN         2  // D4 - GPIO2
-    #define DEF_SCK_PIN         14 // D5 - GPIO14
-    #define DEF_SDIO_PIN        12 // D6 - GPIO12
-#endif
-
-#ifdef RP2040
-    #define CMT_GPIO3           6  // interupt pin
 #endif
 
 //-----------------------------------------------------------------------------
@@ -172,8 +158,9 @@
 
 #ifdef RP2040
     typedef RP2040Spi3w SpiType;
-#else
-    typedef SoftSpi3w<DEF_CS_PIN, DEF_FCS_PIN, DEF_SCK_PIN, DEF_SDIO_PIN> SpiType;
+#else // ESP32
+    typedef esp32_3wSpi SpiType;
+    //typedef SoftSpi3w<DEF_CS_PIN, DEF_FCS_PIN, DEF_SCK_PIN, DEF_SDIO_PIN> SpiType;
 #endif
 
 SpiType spi3w;
@@ -355,9 +342,13 @@ int8_t checkRx() {
                 break;
         }
 
-        #ifdef RP2040
+
         if((state & 0x10) == 0x10) {
-            while(0 == gpio_get(CMT_GPIO3)) {
+            #ifdef RP2040
+            while(0 == gpio_get(INTR_PIN)) {
+            #else
+            while(0 == digitalRead(INTR_PIN)) {
+            #endif
                 usleep(10);
                 if(0 == --timeout) {
                     //Serial.println("GPIO timeout");
@@ -375,10 +366,13 @@ int8_t checkRx() {
                 }
             }
         }
+
+
+        #ifdef RP2040
+            if(0 != gpio_get(INTR_PIN)) {
+        #else
+            if(0 != digitalRead(INTR_PIN)) {
         #endif
-
-
-        if(0 != gpio_get(CMT_GPIO3)) {
             uint32_t loops = 0;
             while((state & 0x1b) != 0x1b) {
                 state = spi3w.readReg(CMT2300A_CUS_INT_FLAG);
@@ -768,7 +762,11 @@ void resetCMT(void) {
     if(!cmtSwitchStatus(CMT2300A_GO_SLEEP, CMT2300A_STA_SLEEP))
         Serial.println("warn: not switched to sleep mode!");
 
-    sleep_us(95);
+    #ifdef RP2040
+        sleep_us(95);
+    #else
+        delayMicroseconds(95);
+    #endif
 
     if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
         Serial.println("warn: not switched to standby mode!");
@@ -815,11 +813,6 @@ void setup() {
     mRecId = 0;
     mLastRecId = 0;
     mRetransmits = 5;
-
-    #ifdef RP2040
-    gpio_init(CMT_GPIO3);
-    gpio_set_dir(CMT_GPIO3, false); // INPUT
-    #endif
 
     delay(1000);
     Serial.println("start");
