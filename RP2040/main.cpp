@@ -184,11 +184,18 @@ uint8_t mStartFreq;
 uint8_t mEndFreq;
 bool mFound;
 uint32_t mPrevMillis;
-bool mTxVerify;
+
+uint8_t mRec[10][32];
+uint8_t mRecId;
+int8_t mRssi[10];
+uint32_t mRxtime[10];
+bool mRxFrag[10];
+uint8_t mRetransmits;
+uint8_t mLastRecId;
 
 // config
-uint32_t ts  = 1676648114; // timestamp
-uint32_t dtu = 0x83266790; //0x81001756; // ;
+uint32_t ts  = 1676804048; // timestamp
+uint32_t dtu = 0x81001765; // 0x83266790; //
 uint32_t wr  = 0x80423810;
 // end config
 
@@ -397,14 +404,19 @@ int8_t checkRx() {
 
 
         // receive ok (pream, sync, node, crc)
-        uint8_t buf[28] = {0};
+        //uint8_t buf[28] = {0};
         if((state & 0x1b) == 0x1b) {
             if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
                 Serial.println("warn: not switched to standby mode!");
 
-            spi3w.readFifo(buf, 28);
+            if(mRecId < 10) {
+                mRxtime[mRecId] = millis() - mRxtime[mRecId];
+                spi3w.readFifo(mRec[mRecId], 28);
+                mRssi[mRecId] = spi3w.readReg(CMT2300A_CUS_RSSI_DBM) - 128;
+                mRxFrag[(mRec[mRecId][10] & 0x7f) - 1] = true;
+                mRecId++;
+            }
 
-            rssi = spi3w.readReg(CMT2300A_CUS_RSSI_DBM) - 128;
 
             if(!cmtSwitchStatus(CMT2300A_GO_SLEEP, CMT2300A_STA_SLEEP))
                 Serial.println("warn: not switched to sleep mode!");
@@ -415,11 +427,11 @@ int8_t checkRx() {
 */
         if((state & 0x1b) == 0x1b) {
             //Serial.println("mLastFreq: " + String(mLastFreq, HEX));
-            dumpBuf("RX", &buf[1], 27, false);
+            //dumpBuf("RX", &buf[1], 27, false);
 
             //Serial.print(", RSSI: " + String(rssi));
 
-            uint8_t len = buf[0] + 1;
+            /*uint8_t len = buf[0] + 1;
             buf[len-0] = 0x00;
             if(buf[0] == 0x1b) {
                 buf[len-2] = 0x00;
@@ -429,7 +441,7 @@ int8_t checkRx() {
                 buf[len-3] = (crc2 >> 8 & 0xff);
                 buf[len-2] = (crc2      & 0xff);
             }
-            Serial.println(", crc8: " + String(crc8(&buf[1], len-1), HEX));
+            Serial.println(", crc8: " + String(crc8(&buf[1], len-1), HEX));*/
         }
     //}
 
@@ -442,6 +454,81 @@ int8_t checkRx() {
 
 //-----------------------------------------------------------------------------
 void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = true, bool verify = false) {
+    if((mRecId > 0) && (mLastRecId != mRecId)) {
+        mLastRecId = mRecId;
+    }
+
+    bool reset = true;
+    if((mRetransmits < 5) && (mRecId > 0)) {
+        mRetransmits++;
+        bool complete = true;
+        for(uint8_t i = 0; i < 5; i++) {
+            if(false == mRxFrag[i]) {
+                Serial.println("retransmit " + String(i+1));
+                buf[0] = 0x15;
+                buf[1] = U32_B3(wr);
+                buf[2] = U32_B2(wr);
+                buf[3] = U32_B1(wr);
+                buf[4] = U32_B0(wr);
+                buf[5] = U32_B3(dtu);
+                buf[6] = U32_B2(dtu);
+                buf[7] = U32_B1(dtu);
+                buf[8] = U32_B0(dtu);
+                buf[9] = (i+1) | 0x80;
+                calcCrc16 = false;
+                calcCrc8 = true;
+                len = 11;
+                complete = false;
+                break;
+            }
+        }
+
+        if(complete) {
+            Serial.println("-----------------------------------");
+            for(uint8_t i = 0; i < mRecId; i++) {
+                dumpBuf("RX", mRec[i], 28, false);
+                Serial.print(" | " + String(mRxtime[i]));
+                Serial.println("ms | " + String(mRssi[i]) + "dBm");
+            }
+            Serial.println("complete!");
+        }
+        reset = complete;
+    } else if(mRetransmits == 5) {
+        bool complete = true;
+        for(uint8_t i = 0; i < 5; i++) {
+            if(false == mRxFrag[i]) {
+                complete = false;
+                break;
+            }
+        }
+
+        Serial.println("-----------------------------------");
+        for(uint8_t i = 0; i < mRecId; i++) {
+            dumpBuf("RX", mRec[i], 28, false);
+            Serial.print(" | " + String(mRxtime[i]));
+            Serial.println("ms | " + String(mRssi[i]) + "dBm");
+        }
+
+        if(complete)
+            Serial.println("complete!");
+        else
+            Serial.println("failed!");
+    }
+
+
+    if(reset) {
+        memset(mRec, 0xcc, 10*32);
+        for(uint8_t i = 0; i < 10; i++) {
+            mRxtime[i] = millis();
+            mRxFrag[i] = false;
+        }
+        mRecId = 0;
+        mRetransmits = 0;
+        mLastRecId = 0;
+    }
+
+
+
     // prepare buf
     if(calcCrc16) {
         buf[len-3] = 0x00;
@@ -453,7 +540,8 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
     }
     if(calcCrc8)
         buf[len-1] = crc8(buf, len-1);
-    dumpBuf("TX", buf, len);
+    //dumpBuf("TX", buf, len);
+
 
     // verify that write pipe is empty
     if(verify == true) {
@@ -711,8 +799,6 @@ void resetCMT(void) {
 
     if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
         Serial.println("warn: not switched to standby mode!");
-
-    mTxVerify = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -724,6 +810,11 @@ void setup() {
     mLastFreq  = mStartFreq;
     mFound     = false;
     spi3w.setup();
+
+    memset(mRec, 0xcc, 10 * 32);
+    mRecId = 0;
+    mLastRecId = 0;
+    mRetransmits = 5;
 
     #ifdef RP2040
     gpio_init(CMT_GPIO3);
@@ -742,21 +833,6 @@ void setup() {
 }
 
 //-----------------------------------------------------------------------------
-/*void rxLoop(void) {
-    int8_t rssi = rxInit();
-    int8_t rssiNew = rssi;
-    for(uint8_t i = 0; i < 100; i++) {
-        rssiNew = checkRx();
-        if(rssiNew != rssi) {
-            if(-128 != rssiNew) {
-                rssi = rssiNew;
-                Serial.println("RSSI: " + String(rssi) + " Freq: " + mLastFreq);
-            }
-        }
-    }
-}*/
-
-//-----------------------------------------------------------------------------
 void loop() {
     if ((millis() - mPrevMillis) > 1000) {
         mPrevMillis = millis();
@@ -767,14 +843,13 @@ void loop() {
             if(cnt < 5) {
                 uint8_t cfg1[15] = {
                     0x56, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
-                    U32_B0(dtu), 0x02, 0x15, 0x21, 0x0f, 0x14, 0x62
+                    U32_B0(dtu), 0x02, 0x15, 0x21, 0x0f, 0x14, 0x00
                 };
-                //txData(cfg1, 15, false, true, mTxVerify);
-                mTxVerify = false;
+                //txData(cfg1, 15, false, true);
             }
         }
 
-        if(((ts % 2) == 0) && (cnt > 5)) {
+        if((cnt > 5)) { //((ts % 2) == 0) &&
             uint8_t rqst[27] = {
                 0x15, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
                 U32_B0(dtu), 0x80, 0x0B, 0x00, U32_B3(ts), U32_B2(ts), U32_B1(ts), U32_B0(ts),
