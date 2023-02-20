@@ -350,6 +350,7 @@ void build() {
 
     if(crc == recCrc) {
         if(HMS2000 == wrType) {
+            printVal(payload,  0, 2,   1,  "?          ", "?");
             printVal(payload,  2, 2,   10, "U_DC -> CH1", "V");
             printVal(payload,  4, 2,   10, "U_DC -> CH2", "V");
             printVal(payload,  6, 2,  100, "I_DC -> CH1", "A");
@@ -378,6 +379,50 @@ void build() {
             printVal(payload, 60, 2,    1, "?    -> CH?", "");
             printVal(payload, 62, 2,   10, "Temp -> CH0", "°C");
             printVal(payload, 64, 2,    1, "?    -> CH?", "");
+        } else if(HMT2250 == wrType) {
+            printVal(payload,  0, 2,    1,  "?          ", "?");
+            printVal(payload,  2, 2,   10, "U_DC -> CH2", "V");
+            printVal(payload,  4, 2,  100, "I_DC -> CH1", "A");
+            printVal(payload,  6, 2,  100, "I_DC -> CH2", "A");
+            printVal(payload,  8, 2,   10, "P_DC -> CH1", "W");
+            printVal(payload, 10, 2,   10, "P_DC -> CH2", "W");
+            printVal(payload, 12, 4, 1000, "YT   -> CH1", "kWh");
+            printVal(payload, 16, 4, 1000, "YT   -> CH2", "kWh");
+            printVal(payload, 20, 2,   10, "     -> ???", "?");
+            printVal(payload, 22, 2,    1, "DC_Zwischenkreis? -> CH2+3", "V");
+            printVal(payload, 24, 2,   10, "U_DC -> CH3", "V");
+            printVal(payload, 26, 2,  100, "I_DC -> CH3", "A");
+            printVal(payload, 28, 2,  100, "I_DC -> CH4", "A");
+            printVal(payload, 30, 2,   10, "P_DC -> CH3", "W");
+            printVal(payload, 32, 2,   10, "P_DC -> CH4", "W");
+            printVal(payload, 34, 4, 1000, "YT   -> CH3", "kWh");
+            printVal(payload, 38, 4, 1000, "YT   -> CH4", "kWh");
+            printVal(payload, 42, 2,    1, "DC_Zwischenkreis? -> CH5+6", "V");
+            printVal(payload, 44, 2,   10, "U_DC -> CH5", "V");
+            printVal(payload, 46, 2,   10, "U_DC -> CH6", "V");
+            printVal(payload, 48, 2,  100, "I_DC -> CH5", "A");
+            printVal(payload, 50, 2,  100, "I_DC -> CH6", "A");
+            printVal(payload, 52, 2,   10, "P_DC -> CH5", "W");
+            printVal(payload, 54, 2,   10, "P_DC -> CH6", "W");
+            printVal(payload, 56, 4, 1000, "YT   -> CH5", "kWh");
+            printVal(payload, 60, 4, 1000, "YT   -> CH6", "kWh");
+            printVal(payload, 64, 2,    1, "?    -> CH0", "");
+            printVal(payload, 66, 2,    1, "?    -> CH0", "");
+            printVal(payload, 68, 2,   10, "U_AC1-> CH0", "V");
+            printVal(payload, 70, 2,   10, "U_AC2-> CH0", "V");
+            printVal(payload, 72, 2,   10, "U_AC3-> CH0", "V");
+            printVal(payload, 74, 2,    1, "YD_1 -> CH0", "");
+            printVal(payload, 76, 2,    1, "YD_2 -> CH0", "");
+            printVal(payload, 78, 2,    1, "YD_3 -> CH0", "");
+            printVal(payload, 80, 2,    1, "YD_4 -> CH0", "");
+            printVal(payload, 82, 2,    1, "YD_5 -> CH0", "");
+            printVal(payload, 84, 2,    1, "YD_6?-> CH0", "");
+            printVal(payload, 86, 2,   10, "Q_1? -> CH0", "var");
+            printVal(payload, 88, 2,   10, "Q_2? -> CH0", "var");
+            printVal(payload, 90, 2,   10, "Q_3? -> CH0", "var");
+            printVal(payload, 92, 2,   10, "Effizienz-> CH0", "%");
+            printVal(payload, 94, 2,   10, "TEMP -> CH0", "°C");
+            printVal(payload, 96, 2,    1, "EVT -> CH0", "");
         } else {
             for(uint8_t i = 0; i < (pos-2); i+=2)
                 printVal(payload, i, 2, 1, "?    -> CH?", "");
