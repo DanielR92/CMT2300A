@@ -171,6 +171,7 @@ uint8_t mStartFreq;
 uint8_t mEndFreq;
 bool mFound;
 uint32_t mPrevMillis;
+uint8_t mDec;
 
 uint8_t mRec[10][32];
 uint8_t mRecId;
@@ -181,7 +182,7 @@ uint8_t mRetransmits;
 uint8_t mLastRecId;
 
 // config
-uint32_t ts  = 1676804048; // timestamp
+uint32_t ts  = 1676882188; // timestamp
 uint32_t dtu = 0x81001765; // 0x83266790; //
 uint32_t wr  = 0x80423810;
 // end config
@@ -251,16 +252,19 @@ bool cmtSwitchStatus(uint8_t cmd, uint8_t waitFor, uint16_t cycles = 50000) {
 
 //-----------------------------------------------------------------------------
 void freqSetting(uint8_t setting, bool send7A = true) {
-    spi3w.writeReg(0x18, 0x42);
-    spi3w.writeReg(0x19, 0x6D);
-    spi3w.writeReg(0x1A, 0x80);
-    spi3w.writeReg(0x1B, 0x86);
-    spi3w.writeReg(0x1C, 0x42);
-    spi3w.writeReg(0x1D, 0x62);
-    spi3w.writeReg(0x1E, 0x27);
-    spi3w.writeReg(0x1F, 0x16);
+    if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+        Serial.println("warn: not switched to standby mode!");
 
-    /*if(0 == setting) { // 871MHz
+    //if(0 == setting) { // 863MHz
+        spi3w.writeReg(0x18, 0x42);
+        spi3w.writeReg(0x19, 0x6D);
+        spi3w.writeReg(0x1A, 0x80);
+        spi3w.writeReg(0x1B, 0x86);
+        spi3w.writeReg(0x1C, 0x42);
+        spi3w.writeReg(0x1D, 0x62);
+        spi3w.writeReg(0x1E, 0x27);
+        spi3w.writeReg(0x1F, 0x16);
+    /*} else if(1 == setting) { // 871MHz
         spi3w.writeReg(0x18, 0x42);
         spi3w.writeReg(0x19, 0xA9);
         spi3w.writeReg(0x1A, 0xA4);
@@ -269,7 +273,7 @@ void freqSetting(uint8_t setting, bool send7A = true) {
         spi3w.writeReg(0x1D, 0x9E);
         spi3w.writeReg(0x1E, 0x4B);
         spi3w.writeReg(0x1F, 0x1C);
-    } else if(1 == setting) { // 872MHz
+    } else if(2 == setting) { // 872MHz
         spi3w.writeReg(0x18, 0x42);
         spi3w.writeReg(0x19, 0x0b);
         spi3w.writeReg(0x1A, 0xcc);
@@ -281,6 +285,10 @@ void freqSetting(uint8_t setting, bool send7A = true) {
     }*/
     if(send7A)
         spi3w.writeReg(0x27, 0x0A);
+
+
+    if(!cmtSwitchStatus(CMT2300A_GO_SLEEP, CMT2300A_STA_SLEEP))
+        Serial.println("warn: not switched to sleep mode!");
 }
 
 //-----------------------------------------------------------------------------
@@ -328,7 +336,7 @@ int8_t checkRx() {
             spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
             spi3w.writeReg(0x16, 0x0C); // [4:3]: RSSI_DET_SEL, [2:0]: RSSI_AVG_MODE
 
-            switchFreq();
+            //switchFreq();
 
             if(!cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX))
                 Serial.println("warn: cant reach RX mode!");
@@ -402,6 +410,8 @@ int8_t checkRx() {
         if((state & 0x1b) == 0x1b) {
             if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
                 Serial.println("warn: not switched to standby mode!");
+
+            mFound = true;
 
             if(mRecId < 10) {
                 mRxtime[mRecId] = millis() - mRxtime[mRecId];
@@ -534,7 +544,7 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
     }
     if(calcCrc8)
         buf[len-1] = crc8(buf, len-1);
-    //dumpBuf("TX", buf, len);
+    dumpBuf("TX", buf, len);
 
 
     // verify that write pipe is empty
@@ -589,8 +599,21 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
 
         spi3w.writeFifo(buf, len);
 
-        //spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, mLastFreq);
-        spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x00);
+        if(!mFound) {
+            if(++mDec == 3) {
+                switchFreq();
+                mDec = 0;
+            }
+        }
+        /*else if(mLastFreq != 0) {
+            if(mDec == 3) {
+                mLastFreq--;
+                mDec = 0;
+            } else
+                mDec++;
+        }*/
+
+        spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, mLastFreq);
 
         if(!cmtSwitchStatus(CMT2300A_GO_TX, CMT2300A_STA_TX))
             Serial.println("warn: cant reach TX mode!");
@@ -768,9 +791,6 @@ void resetCMT(void) {
         delayMicroseconds(95);
     #endif
 
-    if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
-        Serial.println("warn: not switched to standby mode!");
-
     freqSetting(0, false);
     spi3w.writeReg(0x22, 0x20);
     spi3w.writeReg(0x23, 0x20);
@@ -781,9 +801,6 @@ void resetCMT(void) {
     spi3w.writeReg(0x28, 0x9F);
     spi3w.writeReg(0x29, 0x4B);
     spi3w.writeReg(0x27, 0x0A);
-
-    if(!cmtSwitchStatus(CMT2300A_GO_SLEEP, CMT2300A_STA_SLEEP))
-        Serial.println("warn: not switched to sleep mode!");
 
     if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
         Serial.println("warn: not switched to standby mode!");
@@ -804,8 +821,9 @@ void setup() {
     Serial.begin(115200);
     cnt        = 0;
     mStartFreq = 0x00;
-    mEndFreq   = 0x00;
+    mEndFreq   = 0x0F;
     mLastFreq  = mStartFreq;
+    mDec = 0;
     mFound     = false;
     spi3w.setup();
 
@@ -831,22 +849,28 @@ void loop() {
         mPrevMillis = millis();
         cnt++;
 
-        //Serial.println("#" + String(cnt) + ": ");
         if(!mFound) {
-            if(cnt < 5) {
+        //if(!mFound || (mLastFreq != 0)) {
+            if((cnt < 5) || ((cnt % 5) == 0)) {
                 uint8_t cfg1[15] = {
                     0x56, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
                     U32_B0(dtu), 0x02, 0x15, 0x21, 0x0f, 0x14, 0x00
                 };
-                //txData(cfg1, 15, false, true);
+                txData(cfg1, 15, false, true);
+                for(uint8_t i = 0; i < 8; i++)
+                    checkRx();
+                txData(cfg1, 15, false, true);
+                //if(cnt == 2)       freqSetting(1, false);
+                //else if(cnt == 4)  freqSetting(2, false);
+                //else if(cnt == 6) freqSetting(0, false);
             }
         }
 
-        if((cnt > 5)) { //((ts % 2) == 0) &&
+        if((cnt >= 5)) { //((ts % 2) == 0) &&
             uint8_t rqst[27] = {
                 0x15, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
                 U32_B0(dtu), 0x80, 0x0B, 0x00, U32_B3(ts), U32_B2(ts), U32_B1(ts), U32_B0(ts),
-                0x00, 0x00, 0x00, 0x1C, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00
             };
             txData(rqst, 27);
