@@ -338,6 +338,8 @@ int8_t checkRx() {
 
             //switchFreq();
 
+            spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x00); // 863.0 MHz
+
             if(!cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX))
                 Serial.println("warn: cant reach RX mode!");
         }
@@ -550,7 +552,7 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
     // verify that write pipe is empty
     if(verify == true) {
         spi3w.writeReg(0x16, 0x04); // [4:3]: RSSI_DET_SEL, [2:0]: RSSI_AVG_MODE
-        spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x00);
+        //spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x00);
 
         if(!cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX))
             Serial.println("warn: cant reach RX mode!");
@@ -599,21 +601,14 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
 
         spi3w.writeFifo(buf, len);
 
-        if(!mFound) {
-            if(++mDec == 3) {
+        if(!mFound && (len == 15)) {
+            if(++mDec == 4) {
                 switchFreq();
                 mDec = 0;
             }
-        }
-        /*else if(mLastFreq != 0) {
-            if(mDec == 3) {
-                mLastFreq--;
-                mDec = 0;
-            } else
-                mDec++;
-        }*/
+        } else
+            spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x00); // 863.0 MHz
 
-        spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, mLastFreq);
 
         if(!cmtSwitchStatus(CMT2300A_GO_TX, CMT2300A_STA_TX))
             Serial.println("warn: cant reach TX mode!");
@@ -821,7 +816,7 @@ void setup() {
     Serial.begin(115200);
     cnt        = 0;
     mStartFreq = 0x00;
-    mEndFreq   = 0x0F;
+    mEndFreq   = 0x22;
     mLastFreq  = mStartFreq;
     mDec = 0;
     mFound     = false;
@@ -851,18 +846,23 @@ void loop() {
 
         if(!mFound) {
         //if(!mFound || (mLastFreq != 0)) {
-            if((cnt < 5) || ((cnt % 5) == 0)) {
+            if((cnt < 5) || ((cnt % 2) == 0)) {
                 uint8_t cfg1[15] = {
                     0x56, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu),
-                    U32_B0(dtu), 0x02, 0x15, 0x21, 0x0f, 0x14, 0x00
+                    U32_B0(dtu), 0x02, 0x15, 0x21, 0x0c, 0x14, 0x00
                 };
+
+                /**
+                 * 0x0c: 863.00 MHz
+                 * 0x0d: 863.24 MHz
+                 * 0x0e: 863.48 MHz
+                 * 0x0f: 863.72 MHz
+                 * 0x10: 863.96 MHz
+                 * */
                 txData(cfg1, 15, false, true);
                 for(uint8_t i = 0; i < 8; i++)
                     checkRx();
                 txData(cfg1, 15, false, true);
-                //if(cnt == 2)       freqSetting(1, false);
-                //else if(cnt == 4)  freqSetting(2, false);
-                //else if(cnt == 6) freqSetting(0, false);
             }
         }
 
