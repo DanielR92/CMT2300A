@@ -378,14 +378,13 @@ void build() {
             printVal(payload, 60, 2,    1, "?    -> CH?", "");
             printVal(payload, 62, 2,   10, "Temp -> CH0", "°C");
             printVal(payload, 64, 2,    1, "?    -> CH?", "");
-        }
-        else {
+        } else {
             for(uint8_t i = 0; i < len; i+=2)
                 printVal(payload, i, 2, 1, "?    -> CH?", "");
         }
     }
     else
-        Serial.println("PAYLOAD CRC ERROR");
+        Serial.println("PAYLOAD CRC ERROR: " + String(crc, HEX) + " != " + String(recCrc, HEX));
 
 }
 
