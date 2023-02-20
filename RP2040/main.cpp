@@ -379,7 +379,7 @@ void build() {
             printVal(payload, 62, 2,   10, "Temp -> CH0", "°C");
             printVal(payload, 64, 2,    1, "?    -> CH?", "");
         } else {
-            for(uint8_t i = 0; i < len; i+=2)
+            for(uint8_t i = 0; i < (pos-2); i+=2)
                 printVal(payload, i, 2, 1, "?    -> CH?", "");
         }
     }
