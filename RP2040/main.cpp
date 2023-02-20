@@ -181,10 +181,14 @@ bool mRxFrag[10];
 uint8_t mRetransmits;
 uint8_t mLastRecId;
 
+enum {HMS2000 = 0, HMT2250};
+
 // config
 uint32_t ts  = 1676882188; // timestamp
 uint32_t dtu = 0x81001765; // 0x83266790; //
 uint32_t wr  = 0x80423810;
+uint8_t wrType = HMS2000;
+
 // end config
 
 void rxLoop(void);
@@ -305,6 +309,86 @@ void switchFreq(void) {
     // 4: 868.97MHz
     spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, mLastFreq);
 }
+
+//-----------------------------------------------------------------------------
+void printVal(uint8_t pay[], uint8_t offs, uint8_t len, uint16_t div, const char* des, const char* unit) {
+    uint32_t tmp = pay[offs];
+    for(uint8_t i = 1; i < len; i++) {
+        tmp <<= 8;
+        tmp |= pay[offs+i];
+    }
+    char info[30];
+    snprintf(info, 30, "%s: %.2f%s", des, (float)tmp/(float)div, unit);
+    Serial.println(String(info));
+}
+
+//-----------------------------------------------------------------------------
+void build() {
+    uint8_t payload[200];
+    memset(payload, 0xcc, 200);
+
+    uint8_t pos = 0;
+    uint8_t len = 0;
+    uint8_t max = 1;
+
+    if(HMS2000 == wrType)
+        max = 5;
+    else if(HMT2250 == wrType)
+        max = 7;
+
+    for(uint8_t i = 0; i < max; i++) {
+        len = mRec[i][0]-1-10;
+        memcpy(&payload[pos], &mRec[i][11], len);
+        pos += len;
+    }
+
+    //dump(payload, pos);
+    uint16_t crc = crc16(payload, pos-2, 0xffff);
+    uint16_t recCrc = (payload[pos-2] << 8) | payload[pos-1];
+    //Serial.println("crc16: 0x" + String(crc, HEX) + " " + String(recCrc, HEX));
+    //Serial.println("len: " + String(pos-2));
+
+    if(crc == recCrc) {
+        if(HMS2000 == wrType) {
+            printVal(payload,  2, 2,   10, "U_DC -> CH1", "V");
+            printVal(payload,  4, 2,   10, "U_DC -> CH2", "V");
+            printVal(payload,  6, 2,  100, "I_DC -> CH1", "A");
+            printVal(payload,  8, 2,  100, "I_DC -> CH2", "A");
+            printVal(payload, 10, 2,   10, "P_DC -> CH1", "W");
+            printVal(payload, 12, 2,   10, "P_DC -> CH2", "W");
+            printVal(payload, 14, 4, 1000, "YT   -> CH1", "kWh");
+            printVal(payload, 18, 4, 1000, "YT   -> CH2", "kWh");
+            printVal(payload, 22, 2,    1, "YD   -> CH1", "Wh");
+            printVal(payload, 24, 2,    1, "YD   -> CH2", "Wh");
+            printVal(payload, 26, 2,   10, "U_DC -> CH3", "V");
+            printVal(payload, 28, 2,   10, "U_DC -> CH4", "V");
+            printVal(payload, 30, 2,  100, "I_DC -> CH3", "A");
+            printVal(payload, 32, 2,  100, "I_DC -> CH4", "A");
+            printVal(payload, 34, 2,   10, "P_DC -> CH3", "W");
+            printVal(payload, 36, 2,   10, "P_DC -> CH4", "W");
+            printVal(payload, 38, 4, 1000, "YT   -> CH3", "kWh");
+            printVal(payload, 42, 4, 1000, "YT   -> CH4", "kWh");
+            printVal(payload, 46, 2,    1, "YD   -> CH3", "Wh");
+            printVal(payload, 48, 2,    1, "YD   -> CH4", "Wh");
+            printVal(payload, 50, 2,   10, "U_AC -> CH0", "V");
+            printVal(payload, 52, 2,  100, "FREQ -> CH0", "Hz");
+            printVal(payload, 54, 2,   10, "P_AC -> CH0", "W");
+            printVal(payload, 56, 2,    1, "?    -> CH?", "");
+            printVal(payload, 58, 2,    1, "?    -> CH?", "");
+            printVal(payload, 60, 2,    1, "?    -> CH?", "");
+            printVal(payload, 62, 2,   10, "Temp -> CH0", "°C");
+            printVal(payload, 64, 2,    1, "?    -> CH?", "");
+        }
+        else {
+            for(uint8_t i = 0; i < len; i+=2)
+                printVal(payload, i, 2, 1, "?    -> CH?", "");
+        }
+    }
+    else
+        Serial.println("PAYLOAD CRC ERROR");
+
+}
+
 
 //-----------------------------------------------------------------------------
 int8_t checkRx() {
@@ -497,6 +581,7 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
                 Serial.println("ms | " + String(mRssi[i]) + "dBm");
             }
             Serial.println("complete!");
+            build();
         }
         reset = complete;
     } else if(mRetransmits == 5) {
