@@ -443,12 +443,12 @@ void goRx() {
     else
         spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
 
-    if(0x10 == tmp)
-        spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x10);
-    else
-        spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+    //if(0x10 == tmp)
+    //    spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x10);
+    //else
+    //    spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
 
-    spi3w.readReg(CMT2300A_CUS_FIFO_CTL); // necessary? -> if 0x02 last was read
+    //spi3w.readReg(CMT2300A_CUS_FIFO_CTL); // necessary? -> if 0x02 last was read
                                           //                  0x07 last was write
     spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
 
@@ -782,24 +782,24 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
 
     //if(CMT2300A_INT_SEL_TX_DONE != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
     //    spi3w.writeReg(CMT2300A_CUS_INT1_CTL, CMT2300A_INT_SEL_TX_DONE);
-    spi3w.readReg(CMT2300A_CUS_INT1_CTL);
+    //spi3w.readReg(CMT2300A_CUS_INT1_CTL);
     spi3w.writeReg(CMT2300A_CUS_INT1_CTL, CMT2300A_INT_SEL_TX_DONE);
 
     //if(0x00 == spi3w.readReg(CMT2300A_CUS_INT_FLAG))
     {
         // no data received
-        spi3w.readReg(CMT2300A_CUS_INT_CLR1);
+        //spi3w.readReg(CMT2300A_CUS_INT_CLR1);
         spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
         spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
 
-        spi3w.readReg(CMT2300A_CUS_FIFO_CTL); // necessary?
+        //spi3w.readReg(CMT2300A_CUS_FIFO_CTL); // necessary?
         spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x07);
 
         spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x01);
 
-        if(0x01 != spi3w.readReg(0x45))
-            Serial.println("reg 0x45 must be 0x01!");
-        spi3w.writeReg(0x45, 0x01);
+        //if(0x01 != spi3w.readReg(0x45))
+        //    Serial.println("reg 0x45 must be 0x01!");
+        //spi3w.writeReg(0x45, 0x01);
         spi3w.writeReg(0x46, len); // payload length
 
         spi3w.writeFifo(buf, len);
