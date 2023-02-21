@@ -11,6 +11,19 @@
 #endif
 
 //-----------------------------------------------------------------------------
+
+enum {HMS500 = 0, HMS1000, HMS2000, HMT2250};
+
+// config
+//-----------------------------------------------------------------------------
+uint32_t ts  = 1676882188; // timestamp
+uint32_t dtu = 0x81001765; // 0x83266790; //
+uint32_t wr  = 0x80423810;
+uint8_t wrType = HMS2000;
+
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
 #define CMT2300A_MASK_CFG_RETAIN        0x10
 #define CMT2300A_MASK_RSTN_IN_EN        0x20
 #define CMT2300A_MASK_LOCKING_EN        0x20
@@ -183,16 +196,6 @@ uint8_t mMaxFragId;
 uint8_t mLastRecId;
 bool mGotIntr;
 
-enum {HMS2000 = 0, HMT2250};
-
-// config
-uint32_t ts  = 1676882188; // timestamp
-uint32_t dtu = 0x81001765; // 0x83266790; //
-uint32_t wr  = 0x80423810;
-uint8_t wrType = HMS2000;
-
-// end config
-
 void rxLoop(void);
 
 uint8_t getChipStatus(void) {
@@ -334,14 +337,8 @@ void build() {
 
     uint8_t pos = 0;
     uint8_t len = 0;
-    uint8_t max = 1;
 
-    if(HMS2000 == wrType)
-        max = 5;
-    else if(HMT2250 == wrType)
-        max = 7;
-
-    for(uint8_t i = 0; i < max; i++) {
+    for(uint8_t i = 0; i < mMaxFragId; i++) {
         len = mRec[i][0]-1-10;
         memcpy(&payload[pos], &mRec[i][11], len);
         pos += len;
@@ -354,7 +351,44 @@ void build() {
     //Serial.println("len: " + String(pos-2));
 
     if(crc == recCrc) {
-        if(HMS2000 == wrType) {
+        if(HMS500 == wrType) {
+            printVal(payload,  2, 2,   10, "CH1 - U  ", "V");
+            printVal(payload,  4, 2,  100, "CH1 - I  ", "A");
+            printVal(payload,  6, 2,   10, "CH1 - P  ", "W");
+            printVal(payload,  8, 4, 1000, "CH1 - YT ", "kWh");
+            printVal(payload, 12, 2,    1, "CH1 - YD ", "Wh");
+
+            printVal(payload, 14, 2,   10, "CH0 - U  ", "V");
+            printVal(payload, 16, 2,  100, "CH0 - F  ", "Hz");
+            printVal(payload, 18, 2,   10, "CH0 - P  ", "W");
+            printVal(payload, 20, 2,   10, "CH0 - Q  ", "var", false);
+            printVal(payload, 22, 2,  100, "CH0 - I  ", "A");
+            printVal(payload, 24, 2, 1000, "CH0 - PF ", "");
+            printVal(payload, 26, 2,   10, "CH0 - T  ", "°C", false);
+            printVal(payload, 28, 2,    1, "CH0 - EVT", "");
+        }
+        else if(HMS1000 == wrType) {
+            printVal(payload,  2, 2,   10, "CH1 - U  ", "V");
+            printVal(payload,  4, 2,   10, "CH2 - U  ", "V");
+            printVal(payload,  6, 2,  100, "CH1 - I  ", "A");
+            printVal(payload,  8, 2,  100, "CH2 - I  ", "A");
+            printVal(payload, 10, 2,   10, "CH1 - P  ", "W");
+            printVal(payload, 12, 2,   10, "CH2 - P  ", "W");
+            printVal(payload, 14, 4, 1000, "CH1 - YT ", "kWh");
+            printVal(payload, 18, 4, 1000, "CH2 - YT ", "kWh");
+            printVal(payload, 22, 2,    1, "CH1 - YD ", "Wh");
+            printVal(payload, 24, 2,    1, "CH2 - YD ", "Wh");
+
+            printVal(payload, 26, 2,   10, "CH0 - U  ", "V");
+            printVal(payload, 28, 2,  100, "CH0 - F  ", "Hz");
+            printVal(payload, 30, 2,   10, "CH0 - P  ", "W");
+            printVal(payload, 32, 2,   10, "CH0 - Q  ", "var", false);
+            printVal(payload, 34, 2,  100, "CH0 - I  ", "A");
+            printVal(payload, 36, 2, 1000, "CH0 - PF ", "");
+            printVal(payload, 38, 2,   10, "CH0 - T  ", "°C", false);
+            printVal(payload, 40, 2,    1, "CH0 - EVT", "");
+        }
+        else if(HMS2000 == wrType) {
             printVal(payload,  2, 2,   10, "CH1 - U  ", "V");
             printVal(payload,  4, 2,   10, "CH2 - U  ", "V");
             printVal(payload,  6, 2,  100, "CH1 - I  ", "A");
