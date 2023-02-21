@@ -179,6 +179,7 @@ int8_t mRssi[10];
 uint32_t mRxtime[10];
 bool mRxFrag[10];
 uint8_t mRetransmits;
+uint8_t mMaxFragId;
 uint8_t mLastRecId;
 bool mGotIntr;
 
@@ -312,14 +313,17 @@ void switchFreq(void) {
 }
 
 //-----------------------------------------------------------------------------
-void printVal(uint8_t pay[], uint8_t offs, uint8_t len, uint16_t div, const char* des, const char* unit) {
+void printVal(uint8_t pay[], uint8_t offs, uint8_t len, uint16_t div, const char* des, const char* unit, bool isUnsigned = true) {
     uint32_t tmp = pay[offs];
     for(uint8_t i = 1; i < len; i++) {
         tmp <<= 8;
         tmp |= pay[offs+i];
     }
-    char info[30];
-    snprintf(info, 30, "%s: %.2f%s", des, (float)tmp/(float)div, unit);
+    char info[30] = {0};
+    if(isUnsigned)
+        snprintf(info, 30, "%s: %.2f%s", des, (float)tmp/(float)div, unit);
+    else
+        snprintf(info, 30, "%s: %.2f%s", des, ((float)((int16_t)tmp))/(float)div, unit);
     Serial.println(String(info));
 }
 
@@ -374,10 +378,10 @@ void build() {
             printVal(payload, 50, 2,   10, "U_AC -> CH0", "V");
             printVal(payload, 52, 2,  100, "F_AC -> CH0", "Hz");
             printVal(payload, 54, 2,   10, "P_AC -> CH0", "W");
-            printVal(payload, 56, 2,    1, "?    -> CH?", "");
-            printVal(payload, 58, 2,    1, "I_AC -> CH0", "A");
-            printVal(payload, 60, 2, 1000, "PF_AC -> CH0", "");
-            printVal(payload, 62, 2,   10, "Temp -> CH0", "°C");
+            printVal(payload, 56, 2,    1, "Q_AC -> CH?", "var");
+            printVal(payload, 58, 2,  100, "I_AC -> CH0", "A");
+            printVal(payload, 60, 2, 1000, "PF_AC -> CH0", "", false);
+            printVal(payload, 62, 2,   10, "Temp -> CH0", "°C", false);
             printVal(payload, 64, 2,    1, "EVT  -> CH0",   "");
         } else if(HMT2250 == wrType) {
             printVal(payload,  2, 2,   10, "U_DC    -> CH1+2", "V");
@@ -415,12 +419,12 @@ void build() {
             printVal(payload, 78, 2,   10, "U_AC3-1 -> CH0",   "V");
             printVal(payload, 80, 2,  100, "F_AC    -> CH0",   "Hz");
             printVal(payload, 82, 2,   10, "P_AC    -> CH0",   "W");
-            printVal(payload, 84, 2,    1, "Q_AC?   -> CH0",   "var");
+            printVal(payload, 84, 2,   10, "Q_AC    -> CH0",   "var");
             printVal(payload, 86, 2,  100, "I_AC1   -> CH0",   "A");
             printVal(payload, 88, 2,  100, "I_AC2   -> CH0",   "A");
             printVal(payload, 90, 2,  100, "I_AC3   -> CH0",   "A");
-            printVal(payload, 92, 2, 1000, "PF_AC?  -> CH0",   "");
-            printVal(payload, 94, 2,   10, "TEMP    -> CH0",   "°C");
+            printVal(payload, 92, 2, 1000, "PF_AC   -> CH0",   "", false);
+            printVal(payload, 94, 2,   10, "TEMP    -> CH0",   "°C", false);
             printVal(payload, 96, 2,    1, "EVT     -> CH0",   "");
         } else {
             for(uint8_t i = 0; i < (pos-2); i+=2)
@@ -478,6 +482,8 @@ void getRx() {
             spi3w.readFifo(mRec[mRecId], 28);
             mRssi[mRecId] = spi3w.readReg(CMT2300A_CUS_RSSI_DBM) - 128;
             mRxFrag[(mRec[mRecId][10] & 0x7f) - 1] = true;
+            if(mRec[mRecId][10] & 0x80 == 0x80)
+                mMaxFragId = mRec[mRecId][10] & 0x7f;
             mRecId++;
         }
         //Serial.println("RX! mRecId: " + String(mRecId));
@@ -655,32 +661,10 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
         mLastRecId = mRecId;
     }
 
-    uint8_t max = 1;
-    if(HMS2000 == wrType)
-        max = 5;
-    else if(HMT2250 == wrType)
-        max = 7;
-
-    bool reset = true;
-    //if((mRetransmits < 5) && (mRecId > 0)) {
-    //    mRetransmits++;
+    if(mMaxFragId != 0) {
         bool complete = true;
-        for(uint8_t i = 0; i < max; i++) {
+        for(uint8_t i = 0; i < mMaxFragId; i++) {
             if(false == mRxFrag[i]) {
-                /*Serial.println("retransmit " + String(i+1));
-                buf[0] = 0x15;
-                buf[1] = U32_B3(wr);
-                buf[2] = U32_B2(wr);
-                buf[3] = U32_B1(wr);
-                buf[4] = U32_B0(wr);
-                buf[5] = U32_B3(dtu);
-                buf[6] = U32_B2(dtu);
-                buf[7] = U32_B1(dtu);
-                buf[8] = U32_B0(dtu);
-                buf[9] = (i+1) | 0x80;
-                calcCrc16 = false;
-                calcCrc8 = true;
-                len = 11;*/
                 complete = false;
                 break;
             }
@@ -696,41 +680,20 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
             Serial.println("complete!");
             build();
         }
-    /*    reset = complete;
-    } else if(mRetransmits == 5) {
-        bool complete = true;
-        for(uint8_t i = 0; i < max; i++) {
-            if(false == mRxFrag[i]) {
-                complete = false;
-                break;
-            }
-        }
-
-        Serial.println("-----------------------------------");
-        for(uint8_t i = 0; i < mRecId; i++) {
-            dumpBuf("RX", mRec[i], 28, false);
-            Serial.print(" | " + String(mRxtime[i]));
-            Serial.println("ms | " + String(mRssi[i]) + "dBm");
-        }
-
-        if(complete)
-            Serial.println("complete!");
         else
-            Serial.println("failed!");
-    }*/
-
-
-    if(reset) {
-        memset(mRec, 0xcc, 10*32);
-        for(uint8_t i = 0; i < 10; i++) {
-            mRxtime[i] = millis();
-            mRxFrag[i] = false;
-        }
-        mRecId = 0;
-        mRetransmits = 0;
-        mLastRecId = 0;
+            Serial.println("failed!, max: " + String(mMaxFragId));
     }
 
+    // reset
+    memset(mRec, 0xcc, 10*32);
+    for(uint8_t i = 0; i < 10; i++) {
+        mRxtime[i] = millis();
+        mRxFrag[i] = false;
+    }
+    mRecId = 0;
+    mRetransmits = 0;
+    mLastRecId = 0;
+    mMaxFragId = 0;
 
 
     // prepare buf
@@ -1036,6 +999,7 @@ void setup() {
     mRecId = 0;
     mLastRecId = 0;
     mRetransmits = 5;
+    mMaxFragId = 0;
 
     delay(1000);
     Serial.println("start");
