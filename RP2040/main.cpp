@@ -180,6 +180,7 @@ uint32_t mRxtime[10];
 bool mRxFrag[10];
 uint8_t mRetransmits;
 uint8_t mLastRecId;
+bool mGotIntr;
 
 enum {HMS2000 = 0, HMT2250};
 
@@ -433,6 +434,70 @@ void build() {
 
 
 //-----------------------------------------------------------------------------
+void goRx() {
+    spi3w.writeReg(CMT2300A_CUS_INT1_CTL, CMT2300A_INT_SEL_TX_DONE);
+
+    uint8_t tmp = spi3w.readReg(CMT2300A_CUS_INT_CLR1);
+    if(0x08 == tmp) // first time after TX this reg is 0x08
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x04);
+    else
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR1, 0x00);
+
+    if(0x10 == tmp)
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x10);
+    else
+        spi3w.writeReg(CMT2300A_CUS_INT_CLR2, 0x00);
+
+    spi3w.readReg(CMT2300A_CUS_FIFO_CTL); // necessary? -> if 0x02 last was read
+                                          //                  0x07 last was write
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CTL, 0x02);
+
+    spi3w.writeReg(CMT2300A_CUS_FIFO_CLR, 0x02);
+    spi3w.writeReg(0x16, 0x0C); // [4:3]: RSSI_DET_SEL, [2:0]: RSSI_AVG_MODE
+
+    //switchFreq();
+
+    spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x00); // 863.0 MHz
+
+    if(!cmtSwitchStatus(CMT2300A_GO_RX, CMT2300A_STA_RX))
+        Serial.println("warn: cant reach RX mode!");
+}
+
+
+//-----------------------------------------------------------------------------
+void getRx() {
+    uint8_t state = spi3w.readReg(CMT2300A_CUS_INT_FLAG);
+    if((state & 0x1b) == 0x1b) {
+        if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+            Serial.println("warn: not switched to standby mode!");
+
+        mFound = true;
+
+        if(mRecId < 10) {
+            mRxtime[mRecId] = millis() - mRxtime[mRecId];
+            spi3w.readFifo(mRec[mRecId], 28);
+            mRssi[mRecId] = spi3w.readReg(CMT2300A_CUS_RSSI_DBM) - 128;
+            mRxFrag[(mRec[mRecId][10] & 0x7f) - 1] = true;
+            mRecId++;
+        }
+        //Serial.println("RX! mRecId: " + String(mRecId));
+        //dumpBuf("RX", mRec[mRecId-1], 28, true);
+
+
+        if(!cmtSwitchStatus(CMT2300A_GO_SLEEP, CMT2300A_STA_SLEEP))
+            Serial.println("warn: not switched to sleep mode!");
+    }
+    else
+        Serial.println("getRx wrong state: " + String(state, HEX));
+
+    if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+        Serial.println("warn: not switched to standby mode!");
+
+    goRx();
+}
+
+
+//-----------------------------------------------------------------------------
 int8_t checkRx() {
     int8_t rssi = -128;
     /*if(CMT2300A_INT_SEL_TX_DONE != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
@@ -585,7 +650,7 @@ int8_t checkRx() {
 }
 
 //-----------------------------------------------------------------------------
-void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = true, bool verify = false) {
+void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = true) {
     if((mRecId > 0) && (mLastRecId != mRecId)) {
         mLastRecId = mRecId;
     }
@@ -683,7 +748,7 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
 
 
     // verify that write pipe is empty
-    if(verify == true) {
+    /*if(verify == true) {
         spi3w.writeReg(0x16, 0x04); // [4:3]: RSSI_DET_SEL, [2:0]: RSSI_AVG_MODE
         //spi3w.writeReg(CMT2300A_CUS_FREQ_CHNL, 0x00);
 
@@ -708,7 +773,12 @@ void txData(uint8_t buf[], uint8_t len, bool calcCrc16 = true, bool calcCrc8 = t
         if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
             Serial.println("warn: not switched to standby mode!");
         // verify end
-    }
+    }*/
+
+
+
+    if(!cmtSwitchStatus(CMT2300A_GO_STBY, CMT2300A_STA_STBY))
+        Serial.println("warn: not switched to standby mode!");
 
     //if(CMT2300A_INT_SEL_TX_DONE != spi3w.readReg(CMT2300A_CUS_INT1_CTL))
     //    spi3w.writeReg(CMT2300A_CUS_INT1_CTL, CMT2300A_INT_SEL_TX_DONE);
@@ -945,6 +1015,11 @@ void resetCMT(void) {
 }
 
 //-----------------------------------------------------------------------------
+IRAM_ATTR void handleHmsIntr(void) {
+    mGotIntr = true;
+}
+
+//-----------------------------------------------------------------------------
 void setup() {
     Serial.begin(115200);
     cnt        = 0;
@@ -954,6 +1029,8 @@ void setup() {
     mDec = 0;
     mFound     = false;
     spi3w.setup();
+    mGotIntr = false;
+    attachInterrupt(digitalPinToInterrupt(INTR_PIN), handleHmsIntr, RISING);
 
     memset(mRec, 0xcc, 10 * 32);
     mRecId = 0;
@@ -993,9 +1070,10 @@ void loop() {
                  * 0x10: 863.96 MHz
                  * */
                 txData(cfg1, 15, false, true);
-                for(uint8_t i = 0; i < 8; i++)
-                    checkRx();
+                goRx();
+                delayMicroseconds(5);
                 txData(cfg1, 15, false, true);
+                goRx();
             }
         }
 
@@ -1007,8 +1085,14 @@ void loop() {
                 0x00, 0x00, 0x00
             };
             txData(rqst, 27);
+            goRx();
         }
         ts++;
     }
-    checkRx();
+    if(mGotIntr) {
+        //Serial.println("Got Intr");
+        mGotIntr = false;
+        getRx();
+    }
+    //checkRx();
 }
