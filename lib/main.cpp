@@ -24,7 +24,7 @@ bool RX_PKT = false;
 
 // config
 uint32_t ts  = 1675269384; // timestamp
-uint32_t dtu = 0x83266790;
+uint32_t dtu = 0x80423810;
 uint32_t wr  = 0x80724087;  // me - 1164 80724087
             // 0x80423810   // lumapu
             
