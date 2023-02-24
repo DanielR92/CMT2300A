@@ -254,16 +254,16 @@ static  u8 g_cmt2300aSystemBank[CMT2300A_SYSTEM_BANK_SIZE] = {
 /* 867.990 MHz */
 static  u8 g_cmt2300aFrequencyBank_A[CMT2300A_FREQUENCY_BANK_SIZE] = {
 0x42,
-0xCF,
-0xA7,
-0x8C,
+0x6D,
+0x80,
+0x86,
 0x42,
-0xC4,
-0x4E,
-0x1C,
+0x62,
+0x27,
+0x16,
 };
 
-/* [Frequency Bank] B */
+/* [Frequency Bank] B - 871MHz */
 static  u8 g_cmt2300aFrequencyBank_B[CMT2300A_FREQUENCY_BANK_SIZE] = {
 0x42,
 0xA9,
@@ -273,6 +273,18 @@ static  u8 g_cmt2300aFrequencyBank_B[CMT2300A_FREQUENCY_BANK_SIZE] = {
 0x9E,
 0x4B,
 0x1C
+};
+
+/* [Frequency Bank] B - 872MHz */
+static  u8 g_cmt2300aFrequencyBank_C[CMT2300A_FREQUENCY_BANK_SIZE] = {
+0x42,
+0x0B,
+0xCC,
+0x82,
+0x42,
+0x00,
+0x73,
+0x12
 };
 
 /* [Data Rate Bank] */

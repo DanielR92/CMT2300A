@@ -230,14 +230,8 @@ void CMT2300A_FastFreqSwitch(void)
 void IntRegInterupt()
 {
 	CMT2300A_ConfigGpio
-	( // TODO: ?
-        CMT2300A_GPIO1_SEL_INT1
-        /*CMT2300A_GPIO1_SEL_INT2 | 
-        CMT2300A_GPIO3_SEL_DCLK*/
-        
-		//CMT2300A_GPIO1_SEL_INT1 | /* INT1 > GPIO1 */
-		//CMT2300A_GPIO2_SEL_INT2 | /* INT2 > GPIO2 */
-		//CMT2300A_GPIO3_SEL_DOUT
+	(
+        CMT2300A_GPIO3_SEL_INT2
 	);
     CMT2300A_ConfigInterrupt
 	(
@@ -254,7 +248,7 @@ void IntRegInterupt()
 		CMT2300A_MASK_PKT_DONE_EN   // 1
 	);
 
-    CMT2300A_EnableLfosc(false);    ///* Disable low frequency OSC calibration */ 
+    CMT2300A_EnableLfosc(true);    ///* Enable low frequency OSC calibration */ 
     CMT2300A_GoSleep();             /* Go to sleep for configuration to take effect */
 }
 

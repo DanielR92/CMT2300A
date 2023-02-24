@@ -108,7 +108,7 @@ TX 15 80423810 81001765 80 0B00 6384 DE99 0000 0000 0000 0000 B63A AB
 */
 
 void loop() {
-    CMT2300A_FastFreqSwitch();
+    //CMT2300A_FastFreqSwitch();
     delay(time_s * 5000);
     ts += time_s;
     
@@ -133,9 +133,8 @@ void loop() {
 
         rqst[sizeof(rqst)-1] = crc8(rqst, sizeof(rqst)-1);
 
-        CMT2300A_SetPayloadLength(sizeof(rqst));
+        CMT2300A_goTX();
         CMT2300A_WriteFifo(rqst, sizeof(rqst));
-
         dumpBuf("tx: ", rqst, sizeof(rqst));
     }
 
