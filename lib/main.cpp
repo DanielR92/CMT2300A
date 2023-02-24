@@ -24,7 +24,7 @@ bool RX_PKT = false;
 
 // config
 uint32_t ts  = 1675269384; // timestamp
-uint32_t dtu = 0x80423810;
+uint32_t dtu = 0x81001765;
 uint32_t wr  = 0x80724087;  // me - 1164 80724087
             // 0x80423810   // lumapu
             
@@ -67,8 +67,7 @@ void setup() {
         delay(1000);
     }
     
-    Serial.println("CMT2300A int ok.");
-        
+    Serial.println("CMT2300A int ok.");        
     
     /* Set the channel width for fast
     manual frequency hopping. Each bit
@@ -114,11 +113,6 @@ void loop() {
     ts += time_s;
     
     if(CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY)) {
-        CMT2300A_goTX();
-
-        Serial.print("ChipStatus: "); Serial.println(arr[CMT2300A_GetChipStatus()]);
-        Serial.print("RSSI: "); Serial.println(CMT2300A_GetRssiDBm());
-
         uint8_t rqst[] = { 0x15,                              // MainCmd 0x15 REQ_ARW_DAT_ALL
             U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr),     // WR Serial ID
             U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu),     // WR Serial ID
@@ -139,6 +133,7 @@ void loop() {
 
         rqst[sizeof(rqst)-1] = crc8(rqst, sizeof(rqst)-1);
 
+        CMT2300A_SetPayloadLength(sizeof(rqst));
         CMT2300A_WriteFifo(rqst, sizeof(rqst));
 
         dumpBuf("tx: ", rqst, sizeof(rqst));
@@ -152,5 +147,8 @@ void loop() {
         Serial.println();
         
         CMT2300A_goRX();
+
+        Serial.print("ChipStatus: "); Serial.println(arr[CMT2300A_GetChipStatus()]);
+        Serial.print("RSSI: "); Serial.println(CMT2300A_GetRssiDBm());
     }
 }
