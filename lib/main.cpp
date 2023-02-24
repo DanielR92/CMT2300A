@@ -20,9 +20,11 @@ extern uint8_t TPMSpklength;
 uint16_t cnt;
 uint8_t mLastFreq = 0;
 
+bool RX_PKT = false;
+
 // config
 uint32_t ts  = 1675269384; // timestamp
-uint32_t dtu = 0x81001765;
+uint32_t dtu = 0x83266790;
 uint32_t wr  = 0x80724087;  // me - 1164 80724087
             // 0x80423810   // lumapu
             
@@ -46,6 +48,9 @@ void dumpBuf(const char* des, uint8_t buf[], uint8_t len) {
     }
     Serial.println("");
 }
+
+
+
 
 /*! ********************************************************
 * @name    setup
@@ -98,17 +103,22 @@ TX 15 80423810 81001765 80 0B00 6384 DE99 0000 0000 0000 0000 B63A AB
 */
 
 /* TODO: SOF, EOF und die Escape Sequenz (7D) selbst escapen
-7D => 7D5D
-7E => 7D5E
-7F => 7D5F
+7D => 7D 5D
+7E => 7D 5E
+7F => 7D 5F
 */
 
 void loop() {
-    //CMT2300A_FastFreqSwitch();
+    CMT2300A_FastFreqSwitch();
     delay(time_s * 5000);
     ts += time_s;
     
     if(CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY)) {
+        CMT2300A_goTX();
+
+        Serial.print("ChipStatus: "); Serial.println(arr[CMT2300A_GetChipStatus()]);
+        Serial.print("RSSI: "); Serial.println(CMT2300A_GetRssiDBm());
+
         uint8_t rqst[] = { 0x15,                              // MainCmd 0x15 REQ_ARW_DAT_ALL
             U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr),     // WR Serial ID
             U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu),     // WR Serial ID
@@ -129,25 +139,18 @@ void loop() {
 
         rqst[sizeof(rqst)-1] = crc8(rqst, sizeof(rqst)-1);
 
-        CMT2300A_goTX();
         CMT2300A_WriteFifo(rqst, sizeof(rqst));
 
         dumpBuf("tx: ", rqst, sizeof(rqst));
-        CMT2300A_ClearTxFifo();
     }
 
-    if(CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY)) {
-        CMT2300A_goRX();
-        Serial.print("ChipStatus: "); Serial.println(arr[CMT2300A_GetChipStatus()]);
-        Serial.print("RSSI: "); Serial.println(CMT2300A_GetRssiDBm());
+    if(isCMT2300ARecived) {
+        isCMT2300ARecived=false;
+        Serial.println("rx packets?");
 
-        if(isCMT2300ARecived) {
-            isCMT2300ARecived=false;
-            Serial.println("rx packets?");
-            CMT2300A_ReadFifo(TPMSpkBuf, 10);
-            CMT2300A_ClearRxFifo();
-            Serial.printf("%c", TPMSpkBuf);
-            Serial.println();
-        }
+        Serial.printf("%.*s",TPMSpklength,TPMSpkBuf);
+        Serial.println();
+        
+        CMT2300A_goRX();
     }
 }

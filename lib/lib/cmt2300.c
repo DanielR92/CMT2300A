@@ -2,6 +2,7 @@
 
 bool isCMT2300ARecived=false;
 uint8_t TPMSpkBuf[128]={0};
+uint8_t TPMSpklength=27; 
 uint8_t man_freq_hop = 0;
 
 void drv_delay_ms(int _ms)
@@ -213,19 +214,27 @@ void IntRegBank()
     CMT2300A_WriteReg(CMT2300A_CUS_CMT10, tmp|0x02);
 }
 
+/*! ********************************************************
+    // 0: 868.00MHz
+    // 1: 868.23MHz
+    // 2: 868.46MHz
+    // 3: 868.72MHz
+    // 4: 868.97MHz
+* *********************************************************/
 void CMT2300A_FastFreqSwitch(void)
 {
     CMT2300A_WriteReg(CMT2300A_CUS_FREQ_CHNL, ++man_freq_hop);
-    if (man_freq_hop == 2) man_freq_hop = 0;
-    delay(100);
+    if (man_freq_hop == 4) man_freq_hop = 0;
 }
 
 void IntRegInterupt()
 {
 	CMT2300A_ConfigGpio
-	( // Todo?
-        CMT2300A_GPIO1_SEL_INT2 | 
-        CMT2300A_GPIO3_SEL_DCLK
+	( // TODO: ?
+        CMT2300A_GPIO1_SEL_INT1
+        /*CMT2300A_GPIO1_SEL_INT2 | 
+        CMT2300A_GPIO3_SEL_DCLK*/
+        
 		//CMT2300A_GPIO1_SEL_INT1 | /* INT1 > GPIO1 */
 		//CMT2300A_GPIO2_SEL_INT2 | /* INT2 > GPIO2 */
 		//CMT2300A_GPIO3_SEL_DOUT
@@ -252,7 +261,7 @@ void IntRegInterupt()
 void IRAM_ATTR GPIO1_interrupt_callback() 
 {
 	CMT2300A_GoStby();
-	CMT2300A_ReadFifo(TPMSpkBuf, sizeof(TPMSpkBuf));
+	CMT2300A_ReadFifo(TPMSpkBuf, TPMSpklength);
 	CMT2300A_ClearInterruptFlags();		
 	CMT2300A_GoSleep();
 	isCMT2300ARecived=true;
