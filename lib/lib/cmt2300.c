@@ -25,7 +25,7 @@ void IntGPIO(void)
     pinMode(CMT2300A_SPI_MOSI_PIN, OUTPUT);
     pinMode(CMT2300A_SPI_FCSB_PIN, OUTPUT);
     pinMode(CMT2300A_SPI_CSB_PIN, OUTPUT);
-    pinMode(CMT2300A_GPIO1_PIN, INPUT);
+    pinMode(CMT2300A_GPIO3_PIN, INPUT);
 }
 
 void cmt_spi3_init(void)
@@ -271,8 +271,8 @@ bool CMT2300A_Int(void)
     IntRegBank();
     IntRegInterupt();
 
-    pinMode(CMT2300A_GPIO1_PIN, INPUT);
-    attachInterrupt(CMT2300A_GPIO1_PIN, GPIO1_interrupt_callback, RISING);
+    pinMode(CMT2300A_GPIO3_PIN, INPUT);
+    attachInterrupt(CMT2300A_GPIO3_PIN, GPIO1_interrupt_callback, RISING);
     if(!CMT2300A_goRX())
         return false;
     return true;

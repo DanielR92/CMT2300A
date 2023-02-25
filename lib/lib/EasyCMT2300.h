@@ -10,11 +10,10 @@ extern "C" {
 
 // #define CMT2300A_GPIO3_PIN						0
 // #define CMT2300A_GPIO2_PIN						0
-#define CMT2300A_GPIO1_PIN						34  //interupt pin
+#define CMT2300A_GPIO3_PIN						34  //interupt pin
 
 #define CMT2300A_SPI_SCLK_PIN					32
 #define CMT2300A_SPI_MOSI_PIN					12
-//#define CMT2300A_SPI_MISO_PIN					GPIO_Pin_7
 #define CMT2300A_SPI_CSB_PIN					27
 #define CMT2300A_SPI_FCSB_PIN					25
 

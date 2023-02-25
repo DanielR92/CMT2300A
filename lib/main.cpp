@@ -23,7 +23,7 @@ uint8_t mLastFreq = 0;
 bool RX_PKT = false;
 
 // config
-uint32_t ts  = 1675269384; // timestamp
+uint32_t ts  = 1677264735; // timestamp
 uint32_t dtu = 0x81001765;
 uint32_t wr  = 0x80724087;  // me - 1164 80724087
             // 0x80423810   // lumapu
@@ -111,7 +111,7 @@ void loop() {
     //CMT2300A_FastFreqSwitch();
     delay(time_s * 5000);
     ts += time_s;
-    
+
     if(CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY)) {
         uint8_t rqst[] = { 0x15,                              // MainCmd 0x15 REQ_ARW_DAT_ALL
             U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr),     // WR Serial ID
