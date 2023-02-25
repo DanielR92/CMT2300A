@@ -11,6 +11,8 @@ extern bool isCMT2300ARecived;
 extern uint8_t TPMSpkBuf[128];
 extern uint8_t TPMSpklength; 
 
+bool _invFound = false;
+
 #define DEF_SCK_PIN			32
 #define DEF_SDIO_PIN		12
 #define DEF_CS_PIN			27
@@ -109,33 +111,54 @@ TX 15 80423810 81001765 80 0B00 6384 DE99 0000 0000 0000 0000 B63A AB
 
 void loop() {
     //CMT2300A_FastFreqSwitch();
-    delay(time_s * 5000);
+    delay(time_s * 1000);
     ts += time_s;
+    
+    if(CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY)) 
+    {
+        if(!_invFound)
+        {
+            uint8_t rqst[15] = { 0x56, U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr), U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu), 0x02, 0x15, 0x21, 0x0c, 0x14, 0x00};
+            
 
-    if(CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY)) {
-        uint8_t rqst[] = { 0x15,                              // MainCmd 0x15 REQ_ARW_DAT_ALL
-            U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr),     // WR Serial ID
-            U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu),     // WR Serial ID
-            0x80,                                                                           // MultiFrameID 0x80 = SingleFrame
-            0x0B,                                                                           // SubCmd bzw. DataType: 0x0B = RealTimeRunData_Debug, 0x0C RealTimeRunData_Reality
-            0x00,                                                                           // rev Protocol Revision ?
-            U32_B3(ts), U32_B2(ts), U32_B1(ts), U32_B0(ts),     // UNIX timestamp
-            0x00, 0x00, 0x00, 0x04, 
-            0x00, 0x00, 0x00, 0x00,
-            //
-            0xFF, 0xCC,                                                                     // CRC16
-            0x00                                                                            // CRC8
-        };
+            rqst[sizeof(rqst)-1] = crc8(rqst, sizeof(rqst)-1);
 
-        uint16_t crc = crc16(&rqst[10], sizeof(rqst)-13, 0xffff);
-        rqst[24] = (crc >> 8);
-        rqst[25] = crc & 0xff;
+            CMT2300A_goTX();
+            CMT2300A_WriteFifo(rqst, sizeof(rqst));
+            dumpBuf("tx: ", rqst, sizeof(rqst));
+            CMT2300A_goRX();
 
-        rqst[sizeof(rqst)-1] = crc8(rqst, sizeof(rqst)-1);
+            //_invFound = true;
+        }
 
-        CMT2300A_goTX();
-        CMT2300A_WriteFifo(rqst, sizeof(rqst));
-        dumpBuf("tx: ", rqst, sizeof(rqst));
+        
+        if(_invFound)
+        {
+            uint8_t rqst[] = { 0x15,                                        // MainCmd 0x15 REQ_ARW_DAT_ALL
+                U32_B3(wr), U32_B2(wr), U32_B1(wr), U32_B0(wr),     // WR Serial ID
+                U32_B3(dtu), U32_B2(dtu), U32_B1(dtu), U32_B0(dtu), // WR Serial ID
+                0x80,                                               // MultiFrameID 0x80 = SingleFrame
+                0x0B,                                               // SubCmd bzw. DataType: 0x0B = RealTimeRunData_Debug, 0x0C RealTimeRunData_Reality
+                0x00,                                               // rev Protocol Revision ?
+                U32_B3(ts), U32_B2(ts), U32_B1(ts), U32_B0(ts),     // UNIX timestamp
+                0x00, 0x00, 0x00, 0x04, 
+                0x00, 0x00, 0x00, 0x00,
+                //
+                0xFF, 0xCC,                                        // CRC16
+                0x00                                               // CRC8
+            };
+
+            uint16_t crc = crc16(&rqst[10], sizeof(rqst)-13, 0xffff);
+            rqst[24] = (crc >> 8);
+            rqst[25] = crc & 0xff;
+        
+            rqst[sizeof(rqst)-1] = crc8(rqst, sizeof(rqst)-1);
+
+            CMT2300A_goTX();
+            CMT2300A_WriteFifo(rqst, sizeof(rqst));
+            dumpBuf("tx: ", rqst, sizeof(rqst));
+            CMT2300A_goRX();
+        }
     }
 
     if(isCMT2300ARecived) {
@@ -145,7 +168,6 @@ void loop() {
         Serial.printf("%.*s",TPMSpklength,TPMSpkBuf);
         Serial.println();
         
-        CMT2300A_goRX();
 
         Serial.print("ChipStatus: "); Serial.println(arr[CMT2300A_GetChipStatus()]);
         Serial.print("RSSI: "); Serial.println(CMT2300A_GetRssiDBm());

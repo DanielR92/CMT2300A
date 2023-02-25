@@ -252,7 +252,7 @@ void IntRegInterupt()
     CMT2300A_GoSleep();             /* Go to sleep for configuration to take effect */
 }
 
-void IRAM_ATTR GPIO1_interrupt_callback() 
+void IRAM_ATTR GPIO3_interrupt_callback() 
 {
 	CMT2300A_GoStby();
 	CMT2300A_ReadFifo(TPMSpkBuf, TPMSpklength);
@@ -272,7 +272,7 @@ bool CMT2300A_Int(void)
     IntRegInterupt();
 
     pinMode(CMT2300A_GPIO3_PIN, INPUT);
-    attachInterrupt(CMT2300A_GPIO3_PIN, GPIO1_interrupt_callback, RISING);
+    attachInterrupt(CMT2300A_GPIO3_PIN, GPIO3_interrupt_callback, RISING);
     if(!CMT2300A_goRX())
         return false;
     return true;
