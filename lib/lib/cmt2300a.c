@@ -746,7 +746,7 @@ void CMT2300A_Init(void)
     tmp |= CMT2300A_MASK_LOCKING_EN;         /* Enable LOCKING_EN */
     CMT2300A_WriteReg(CMT2300A_CUS_EN_CTL, tmp);
     
-    CMT2300A_EnableLfosc(false);             /* Diable LFOSC */
+    CMT2300A_EnableLfosc(true);             /* Enable LFOSC */
 
     CMT2300A_ClearInterruptFlags();
 }
