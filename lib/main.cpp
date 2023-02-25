@@ -71,13 +71,6 @@ void setup() {
     
     Serial.println("CMT2300A int ok.");        
     
-    /* Set the channel width for fast
-    manual frequency hopping. Each bit
-    increases by about 2.5kHz, and the
-    maximum channel width is 2.5x255
-    = 637.5 kHz */
-    CMT2300A_SetFrequencyStep(0x64); // from Lumapu log it is on time 0x64 = 100
-
     if(CMT2300A_AutoSwitchStatus(CMT2300A_GO_STBY)) 
         Serial.println("standby mode reached");
 }
