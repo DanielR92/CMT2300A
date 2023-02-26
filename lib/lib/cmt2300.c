@@ -248,7 +248,6 @@ void IntRegInterupt()
 		CMT2300A_MASK_PKT_DONE_EN   // 1
 	);
 
-    CMT2300A_EnableLfosc(true);    ///* Enable low frequency OSC calibration */ 
     CMT2300A_GoSleep();             /* Go to sleep for configuration to take effect */
 }
 
