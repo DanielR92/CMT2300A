@@ -50,6 +50,7 @@ uint8_t cmtBaseChOff860;            // offset from initalized CMT base frequency
 uint8_t cmtActualCh;                // actual used channel, should be stored per inverter und set before next Tx, if hopping is used
 
 bool cmtFirstRx;                    // first data received
+uint8_t cmtTx56toCh;                // send CMD56 active to Channel xx, inactive = 0xFF
 
 uint8_t cmtRec[10][32];             // 10 frames with max. 32 byte
 uint8_t cmtRecId;                   // actual frame count (++ for each received, irrespective of frame number)
@@ -66,6 +67,7 @@ IRAM_ATTR void cmtHandlePktOkIntr(void) {
 bool RF_Init(void)
 {
     cmtFirstRx = false;
+    cmtTx56toCh = 0xFF;
 
     u8 tmp;
 
@@ -74,14 +76,14 @@ bool RF_Init(void)
         return false;
     
     /* Config registers */
-    CMT2300A_ConfigRegBank(CMT2300A_CMT_BANK_ADDR       , g_cmt2300aCmtBank          , CMT2300A_CMT_BANK_SIZE       );
-    CMT2300A_ConfigRegBank(CMT2300A_SYSTEM_BANK_ADDR    , g_cmt2300aSystemBank       , CMT2300A_SYSTEM_BANK_SIZE    );
-    CMT2300A_ConfigRegBank(CMT2300A_FREQUENCY_BANK_ADDR , g_cmt2300aFrequencyBank_EU , CMT2300A_FREQUENCY_BANK_SIZE );
-    CMT2300A_ConfigRegBank(CMT2300A_DATA_RATE_BANK_ADDR , g_cmt2300aDataRateBank     , CMT2300A_DATA_RATE_BANK_SIZE );
-    CMT2300A_ConfigRegBank(CMT2300A_BASEBAND_BANK_ADDR  , g_cmt2300aBasebandBank_EU  , CMT2300A_BASEBAND_BANK_SIZE  );
-    CMT2300A_ConfigRegBank(CMT2300A_TX_BANK_ADDR        , g_cmt2300aTxBank           , CMT2300A_TX_BANK_SIZE        );
+    CMT2300A_ConfigRegBank(CMT2300A_CMT_BANK_ADDR       , g_cmt2300aCmtBank           , CMT2300A_CMT_BANK_SIZE       );
+    CMT2300A_ConfigRegBank(CMT2300A_SYSTEM_BANK_ADDR    , g_cmt2300aSystemBank        , CMT2300A_SYSTEM_BANK_SIZE    );
+    CMT2300A_ConfigRegBank(CMT2300A_FREQUENCY_BANK_ADDR , g_cmt2300aFrequencyBank_860 , CMT2300A_FREQUENCY_BANK_SIZE ); // cmtBaseChOff860 need to be changed to the same frequency for channel calculation
+    CMT2300A_ConfigRegBank(CMT2300A_DATA_RATE_BANK_ADDR , g_cmt2300aDataRateBank      , CMT2300A_DATA_RATE_BANK_SIZE );
+    CMT2300A_ConfigRegBank(CMT2300A_BASEBAND_BANK_ADDR  , g_cmt2300aBasebandBank_EU   , CMT2300A_BASEBAND_BANK_SIZE  );
+    CMT2300A_ConfigRegBank(CMT2300A_TX_BANK_ADDR        , g_cmt2300aTxBank            , CMT2300A_TX_BANK_SIZE        );
 
-    cmtBaseChOff860 = (863000000 - HOY_BASE_FREQ) / CMT2300A_ONE_STEP_SIZE / FH_OFFSET; // 3 MHz(diff) / 2.5 kHz / 100 = channel 12
+    cmtBaseChOff860 = (860000000 - HOY_BASE_FREQ) / CMT2300A_ONE_STEP_SIZE / FH_OFFSET;
 
     // xosc_aac_code[2:0] = 2
     tmp = (~0x07) & CMT2300A_ReadReg(CMT2300A_CUS_CMT10);
@@ -185,6 +187,14 @@ void RF_StartTx(u8 buf[], u16 len, u32 timeout)
 
 String cmtGetActFreq(void) {
     return String((HOY_BASE_FREQ + (cmtBaseChOff860 + cmtActualCh) * FH_OFFSET * CMT2300A_ONE_STEP_SIZE) / 1000000.0, 2) + String(" MHz");
+}
+
+void cmtSwitchChannel(const uint8_t channel) {
+    yield();
+    CMT2300A_SetFrequencyChannel(channel);
+    yield();
+    cmtActualCh = channel;
+    //Serial.println("[cmtSwitchChannel] switched channel to " + cmtGetActFreq());
 }
 
 void cmtBuild(void) {
@@ -381,6 +391,11 @@ EnumRFResult RF_Process(void)
         CMT2300A_ClearInterruptFlags();
         CMT2300A_GoSleep();
 
+        if(cmtTx56toCh != 0xFF) {
+            cmtSwitchChannel(cmtTx56toCh);
+            cmtTx56toCh = 0xFF;
+        }
+
         //g_nNextRFState = RF_STATE_IDLE;
         g_nNextRFState = RF_STATE_RX_START; // receive answer
         g_nTxTimeout = 500;
@@ -447,20 +462,12 @@ void cmtTxData(uint8_t buf[], uint8_t len, const bool calcCrc16, const bool calc
     RF_StartTx(buf, len, 500);
 }
 
-void cmtSwitchChannel(const uint8_t channel) {
-    yield();
-    CMT2300A_SetFrequencyChannel(channel);
-    yield();
-    cmtActualCh = channel;
-    Serial.println("[cmtSwitchChannel] switched channel to " + cmtGetActFreq());
-}
-
 uint8_t cmtFreqToChan(const String func_name, const String var_name, uint32_t freq_kHz) {
     if((freq_kHz % 250) != 0) {
         Serial.println(func_name + " " + var_name + " " + String(freq_kHz/1000.0, 3) + " MHz is not divisible by 250 kHz!");
         return 0xFF; // ERROR
     }
-    const uint32_t min_Freq_kHz = (HOY_BASE_FREQ + cmtBaseChOff860 * CMT2300A_ONE_STEP_SIZE * FH_OFFSET) / 1000; // frequency can not be lower than actual initailized base freq
+    const uint32_t min_Freq_kHz = (HOY_BASE_FREQ + (cmtBaseChOff860 >= 1 ? cmtBaseChOff860 : 1) * CMT2300A_ONE_STEP_SIZE * FH_OFFSET) / 1000; // frequency can not be lower than actual initailized base freq
     const uint32_t max_Freq_kHz = (HOY_BASE_FREQ + 0xFE * CMT2300A_ONE_STEP_SIZE * FH_OFFSET) / 1000; // =923500, 0xFF does not work
     if(freq_kHz < min_Freq_kHz || freq_kHz > max_Freq_kHz) {
         Serial.println(func_name + " " + var_name + " " + String(freq_kHz/1000.0, 2) + " MHz is out of range! (" + String(min_Freq_kHz/1000.0, 2) + " MHz - " + String(max_Freq_kHz/1000.0, 2) + " MHz)");
@@ -491,7 +498,7 @@ bool cmtSwitchInvAndDtuFreq(const uint32_t from_freq_kHz, const uint32_t to_freq
         0x02, 0x15, 0x21, (uint8_t)(cmtBaseChOff860 + toChannel), 0x14, 0x00
     };
     cmtTxData(cfg1, sizeof(cfg1), false, true);
-    cmtSwitchChannel(toChannel);
+    cmtTx56toCh = toChannel;
 
     return true;
 }

@@ -78,35 +78,33 @@ void printData(uint8_t payload[], uint8_t length) {
             printVal(payload, 40, 2,    1, "CH0 - EVT", "");
             break;
         case 0x1164: // HMS 4 channels
-            /*printVal(payload,  2, 2,   10, "CH1 - U  ", "V");
-            printVal(payload,  6, 2,  100, "CH1 - I  ", "A");
-            printVal(payload, 10, 2,   10, "CH1 - P  ", "W");
-            printVal(payload, 22, 2,    1, "CH1 - YD ", "Wh");
-            printVal(payload, 14, 4, 1000, "CH1 - YT ", "kWh");
-
+            printVal(payload,  2, 2,   10, "CH1 - U  ", "V");
             printVal(payload,  4, 2,   10, "CH2 - U  ", "V");
+            printVal(payload,  6, 2,  100, "CH1 - I  ", "A");
             printVal(payload,  8, 2,  100, "CH2 - I  ", "A");
+            printVal(payload, 10, 2,   10, "CH1 - P  ", "W");
             printVal(payload, 12, 2,   10, "CH2 - P  ", "W");
-            printVal(payload, 24, 2,    1, "CH2 - YD ", "Wh");
+            printVal(payload, 14, 4, 1000, "CH1 - YT ", "kWh");
             printVal(payload, 18, 4, 1000, "CH2 - YT ", "kWh");
+            printVal(payload, 22, 2,    1, "CH1 - YD ", "Wh");
+            printVal(payload, 24, 2,    1, "CH2 - YD ", "Wh");
 
             printVal(payload, 26, 2,   10, "CH3 - U  ", "V");
-            printVal(payload, 30, 2,  100, "CH3 - I  ", "A");
-            printVal(payload, 34, 2,   10, "CH3 - P  ", "W");
-            printVal(payload, 46, 2,    1, "CH3 - YD ", "Wh");
-            printVal(payload, 38, 4, 1000, "CH3 - YT ", "kWh");
-
             printVal(payload, 28, 2,   10, "CH4 - U  ", "V");
+            printVal(payload, 30, 2,  100, "CH3 - I  ", "A");
             printVal(payload, 32, 2,  100, "CH4 - I  ", "A");
+            printVal(payload, 34, 2,   10, "CH3 - P  ", "W");
             printVal(payload, 36, 2,   10, "CH4 - P  ", "W");
+            printVal(payload, 38, 4, 1000, "CH3 - YT ", "kWh");
             printVal(payload, 42, 4, 1000, "CH4 - YT ", "kWh");
-            printVal(payload, 48, 2,    1, "CH4 - YD ", "Wh");*/
+            printVal(payload, 46, 2,    1, "CH3 - YD ", "Wh");
+            printVal(payload, 48, 2,    1, "CH4 - YD ", "Wh");
 
             printVal(payload, 50, 2,   10, "CH0 - U  ", "V");
-            printVal(payload, 58, 2,  100, "CH0 - I  ", "A");
+            printVal(payload, 52, 2,  100, "CH0 - F  ", "Hz");
             printVal(payload, 54, 2,   10, "CH0 - P  ", "W");
             printVal(payload, 56, 2,   10, "CH0 - Q  ", "var", 1);
-            printVal(payload, 52, 2,  100, "CH0 - F  ", "Hz");
+            printVal(payload, 58, 2,  100, "CH0 - I  ", "A");
             printVal(payload, 60, 2, 1000, "CH0 - PF ", "", 2);
             printVal(payload, 62, 2,   10, "CH0 - T  ", "°C", 1);
             printVal(payload, 64, 2,    1, "CH0 - EVT", "");
